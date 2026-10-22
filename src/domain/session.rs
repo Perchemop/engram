@@ -147,6 +147,7 @@ mod tests {
     use super::*;
     use crate::domain::library::QueueKind;
     use chrono::TimeZone;
+    use uuid::Uuid;
 
     fn t(minute: u32) -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 1, 15, 12, 0, minute).unwrap()

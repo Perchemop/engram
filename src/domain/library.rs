@@ -83,6 +83,17 @@ pub enum Scope {
     Deck(DeckId),
 }
 
+impl Scope {
+    /// Map an optional deck selection onto a scope (`None` = all).
+    #[must_use]
+    pub fn from_option(deck: Option<DeckId>) -> Self {
+        match deck {
+            None => Self::All,
+            Some(id) => Self::Deck(id),
+        }
+    }
+}
+
 /// Which part of the queue an entry belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QueueKind {

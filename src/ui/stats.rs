@@ -122,7 +122,7 @@ fn heatmap(ui: &mut Ui, activity: &[stats::DailyCount], t: Theme) {
                 Vec2::splat(cell),
             );
             painter.rect_filled(r, 4.0, heat_color(day.reviews, t));
-            if r.contains(resp.hover_pos()) {
+            if resp.hover_pos().is_some_and(|p| r.contains(p)) {
                 tooltip = Some((day.date, day.reviews));
             }
         }
