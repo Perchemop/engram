@@ -288,7 +288,7 @@ impl EngramApp {
                 }
                 self.revealed = false;
                 self.dirty = true;
-                if self.session.as_ref().is_some_and(StudySession::finished) {
+                if self.session.as_ref().is_some_and(|s| s.finished) {
                     if let Some(s) = self.session.as_ref().map(StudySession::summary) {
                         self.status = format!(
                             "Session complete: {} card(s), {:.0}% recalled",

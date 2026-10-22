@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 
 use crate::domain::{
-    format_interval, render_cloze_blank, CardFilter, CardId, CardKind, LearnPhase, Scope, Theme,
+    format_interval, render_cloze_blank, CardId, CardKind, LearnPhase, Scope, Theme,
 };
 use crate::ui::{app::EngramApp, editor, theme};
 
@@ -57,7 +57,7 @@ pub fn show_tree(ui: &mut Ui, app: &mut EngramApp) {
                         .color
                         .map(theme::deck_color)
                         .unwrap_or_else(|| Color32::from_rgb(120, 120, 140));
-                    let (resp, rect) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
+                    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
                     ui.painter().circle_filled(rect.center(), 4.0, dot);
                     resp.on_hover_text(summary.name.clone());
 
@@ -132,7 +132,7 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                 .clicked()
             {
                 if let Some(id) = app.selected_deck {
-                    app.deck_dialog = Some(editor::DeckDialog::edit_deck(id, &app.library));
+                    app.deck_dialog = editor::DeckDialog::edit_deck(id, &app.library);
                 }
             }
             if ui
@@ -290,8 +290,7 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                         ui.label(due_label(&card.sched.phase, card.sched.due, now, t));
                         ui.horizontal(|ui| {
                             if ui.small_button("Edit").clicked() {
-                                app.card_editor =
-                                    Some(editor::CardEditor::edit_card(id, &app.library));
+                                app.card_editor = editor::CardEditor::edit_card(id, &app.library);
                             }
                             if ui.small_button("✕").on_hover_text("Delete card").clicked() {
                                 let _ = app.library.delete_card(id);

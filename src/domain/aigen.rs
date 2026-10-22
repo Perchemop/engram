@@ -153,7 +153,7 @@ fn split_definition(line: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn non_empty_pair(t: &str, d: &str) -> Option<(&str, &str)> {
+fn non_empty_pair<'a>(t: &'a str, d: &'a str) -> Option<(&'a str, &'a str)> {
     if t.is_empty() || d.is_empty() {
         None
     } else {
@@ -178,7 +178,11 @@ fn copula_cloze(line: &str) -> Option<String> {
             if subject.is_empty() || word_count > 3 {
                 continue;
             }
-            let blanked = format!("{{{{c1::{subject}}}}{}", &line[pos..]);
+            let mut blanked = String::with_capacity(line.len() + 12);
+            blanked.push_str("{{c1::");
+            blanked.push_str(subject);
+            blanked.push_str("}}");
+            blanked.push_str(&line[pos..]);
             return Some(blanked);
         }
     }

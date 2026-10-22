@@ -6,7 +6,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::domain::card::CardId;
 use crate::domain::library::QueueKind;
@@ -40,7 +39,7 @@ impl SessionSummary {
         if self.total == 0 {
             return 0.0;
         }
-        1.0 - f64::from(self.again) / f64::from(self.total as u32)
+        (self.total - self.again) as f64 / self.total as f64
     }
 }
 
@@ -187,7 +186,7 @@ mod tests {
     #[test]
     fn end_early_keeps_summary() {
         let mut s = StudySession::new(queue(5), t(0));
-        s.answer(Grade::Hard, t(1)).unwrap();
+        s.answer(Grade::Hard, t(1));
         s.end();
         assert!(s.finished);
         assert_eq!(s.summary().total, 1);

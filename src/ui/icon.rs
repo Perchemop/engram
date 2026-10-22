@@ -33,6 +33,11 @@ pub fn icon_rgba(size: usize) -> Vec<u8> {
             let (mut fr, mut fg, mut fb) = (r, g, b);
             let mut cover = 0.0f32;
 
+            // Glyph distances from the mark's centre.
+            let dx = px - cx;
+            let dy = py - cy;
+            let d = dx.hypot(dy);
+
             // Nucleus dot.
             if d < n * 0.055 {
                 cover = 1.0;

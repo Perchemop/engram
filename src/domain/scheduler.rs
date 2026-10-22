@@ -166,7 +166,6 @@ fn clampf(v: f64, lo: f64, hi: f64) -> f64 {
 
 /// The scheduling state of a single card.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
 pub struct SchedulingState {
     pub phase: LearnPhase,
     /// Index into the current step list (learning / relearning).

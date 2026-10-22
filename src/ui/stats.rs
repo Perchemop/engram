@@ -109,7 +109,7 @@ fn heatmap(ui: &mut Ui, activity: &[stats::DailyCount], t: Theme) {
 
         let width = weeks as f32 * (cell + gap);
         let height = rows as f32 * (cell + gap);
-        let (resp, rect) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
+        let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
         let painter = ui.painter_at(rect);
 
         let mut tooltip: Option<(NaiveDate, u32)> = None;
@@ -147,7 +147,7 @@ fn forecast(ui: &mut Ui, days: &[stats::DailyDue], _t: Theme) {
                     .size(11.0),
             );
             let w = 8.0 + 180.0 * (day.due as f32 / max as f32);
-            let (_, rect) = ui.allocate_exact_size(Vec2::new(w, 14.0), Sense::hover());
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(w, 14.0), Sense::hover());
             ui.painter().rect_filled(rect, 3.0, theme::ACCENT);
             ui.label(day.due.to_string());
         });

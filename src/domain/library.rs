@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::domain::card::{normalise_tags, Card, CardId, CardKind};
+use crate::domain::card::{normalise_tags, Card, CardError, CardId, CardKind};
 use crate::domain::deck::{summarise_forest, Deck, DeckColor, DeckError, DeckId, DeckSummary};
 use crate::domain::scheduler::{schedule, Grade, LearnPhase, SchedParams, SchedulingState};
 use crate::domain::session::StudySession;
@@ -144,7 +144,6 @@ impl CardFilter {
 
 /// The root aggregate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
 pub struct Library {
     pub schema_version: u32,
     pub name: String,
@@ -378,7 +377,6 @@ impl Library {
                 return Err(DeckError::Cycle.into());
             }
         }
-        let parent = self.deck(id).ok_or(DeckError::NotFound(id))?.parent;
         let name = self.deck(id).ok_or(DeckError::NotFound(id))?.name.clone();
         let dup = self
             .decks

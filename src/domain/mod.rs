@@ -15,10 +15,13 @@ pub mod stats;
 pub mod theme;
 
 pub use aigen::{generate_drafts, DraftCard, DraftKind};
-pub use card::{Card, CardError, CardId, CardKind, CARD_ID_NIL};
+pub use card::{
+    collect_cloze_numbers, count_cloze_groups, render_cloze_blank, render_cloze_revealed, Card,
+    CardError, CardId, CardKind, CARD_ID_NIL,
+};
 pub use deck::{Deck, DeckColor, DeckError, DeckId, DeckSummary};
 pub use library::{
-    CardFilter, Library, LibraryError, LibrarySettings, QueueKind, ReviewLog, ReviewOutcome,
+    CardFilter, Library, LibraryError, LibrarySettings, QueueKind, ReviewLog, ReviewOutcome, Scope,
     DEFAULT_DAILY_NEW_LIMIT, DEFAULT_DAILY_REVIEWS_LIMIT, SCHEMA_VERSION,
 };
 pub use scheduler::{
