@@ -1,0 +1,58 @@
+# Implementation Plan
+
+Vertical slices, per the guide (§8). Statuses: ☐ todo · ◐ partial · ☑ done
+(CI-verified).
+
+## Phase 0 — Discovery, naming, repository, scaffold
+- [x] Discovery questions answered; docs recorded (`docs/project-brief.md`,
+      `docs/scope.md`, `docs/inspiration.md`).
+- [x] Original name invented and locked: **Engram** (`docs/product-name.md`).
+      "SynapseFlow" was rejected as too close to the inspiration product.
+- [x] Public GitHub repository created (`Perchemop/engram`).
+- [x] `.gitignore` refuses the local build guide.
+- [x] Cargo project, toolchain pin, CI workflow, `.ci-required.txt`.
+- [x] Agent definitions (`.opencode/agents/*`) with CI-first rules.
+- [x] Tracking files (this list, PROGRESS, DECISIONS, traceability,
+      CHANGELOG, ATTRIBUTION, README, LICENSE, AGENTS.md).
+
+## Phase 1 — Domain core (Slice 1)
+- [x] `domain::card` — Card, CardKind (Basic/Cloze), cloze rendering, tags,
+      validation, serde roundtrips.
+- [x] `domain::deck` — Deck, colours, forest summarisation with ordering.
+- [x] `domain::scheduler` — SM-2 with steps/clamps; preview formatting.
+- [x] `domain::library` — commands (decks, cards, reviews), search, due
+      counts, session building; error taxonomy.
+- [x] `domain::session` — queue walking, answers, summary.
+- [x] `domain::stats` — activity window, retention, streak, forecast.
+- [x] `domain::aigen` — offline draft generation from notes.
+- [x] Unit tests for all of the above (headless).
+
+## Phase 2 — Data layer (Slice 2)
+- [x] `data::store` — atomic JSON persistence, default paths, prefs.
+- [x] `data::export` — CSV export/import, JSON backup, scope counting.
+- [x] Disk roundtrip + CSV roundtrip integration tests.
+
+## Phase 3 — UI shell + pages (Slice 3)
+- [x] App shell: menu bar, page tabs, status area, bottom bar, theme apply.
+- [x] Decks page: tree panel with counts/actions, card table with
+      search/tag filter/selection, delete confirmations.
+- [x] Card editor + deck dialog + settings dialog (SM-2 parameters).
+- [x] Study page: start screen with scope+counts, reveal/grade flow with
+      interval previews, end-of-session summary.
+- [x] Stats page: tiles, 5-week heatmap, 14-day forecast.
+- [x] Generate page: notes → drafts → add to deck.
+- [x] Keyboard shortcuts: Ctrl+S save, Space/Enter reveal, 1–4 grade,
+      Esc cancel/end.
+- [x] Procedural app icon; violet dark/light theme.
+
+## Phase 4 — Verification and hardening (Slice 4)
+- [ ] CI green on all three OS runners (first run pending).
+- [ ] Reviewer pass over the full diff.
+- [ ] Manual QC checklist walked (UI spot-checks on Linux build).
+- [ ] Traceability table completed with test evidence.
+
+## Phase 5 — Post-V1 backlog (explicitly deferred)
+- [ ] WASM/web build with browser storage.
+- [ ] Multi-cloze-per-card study (one deletion per review).
+- [ ] Card history browser; suspend/bury; filtered "cram" decks.
+- [ ] Deck-local settings overrides (per-deck daily limits).

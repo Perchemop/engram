@@ -1,0 +1,30 @@
+# Local-only files — never commit, never push.
+# The personal build guide and any reference material live outside this
+# repository. `guide.md` is ignored so it can never be committed by mistake.
+guide.md
+
+# Secrets
+.env
+.env.*
+!.env.example
+secrets/
+*.keystore
+*.jks
+*.p12
+*.pem
+
+# Rust / build
+/target/
+**/*.rs.bk
+*.profraw
+
+# Generated/exported user data
+*.synapseflow.json
+!assets/example.synapseflow.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
