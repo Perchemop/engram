@@ -7,6 +7,29 @@ never rewrite history.
 
 ---
 
+## 2026-10-23 — ARM64 build, launch smoke test, QC close-out (PR #4 merged)
+
+- **PR #4 merged** (PR CI `39949148154`, main CI `39949643789`): the build
+  matrix now includes a free `ubuntu-24.04-arm` runner → `engram-linux-arm64`
+  artefact. The owner's machine is aarch64, so the binary is now runnable
+  locally (the x86_64 artefact never was).
+- **Launch smoke test:** the arm64 binary from run `39949643789` launched
+  with an isolated `XDG_DATA_HOME`, ran 8s without crash, wgpu initialised
+  (llvmpipe software rasteriser in the VM). Behaviour note: no library file
+  is written until the first change (now documented).
+- **Guide §9/§12 close-out:** `docs/known-limitations.md` written; evidence
+  based `docs/implementation-report.md` produced; secrets scan of the full
+  history + tree came back clean.
+- Platform set now: Linux x86_64, Linux aarch64, Windows, macOS.
+
+### Open items (next session)
+1. Human keyboard/visual QC walk (`docs/qc/checklist.md`) on the
+   `engram-linux-arm64` artefact.
+2. Deferred: per-frame memoisation of deck summaries / filtered ids.
+
+---
+
+
 ## 2026-10-23 — Review-fix slice merged via PR #1 (first CTO-style cycle complete)
 
 | Signal | State |
