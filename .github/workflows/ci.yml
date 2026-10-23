@@ -26,12 +26,32 @@ jobs:
       run: cargo test --all
     - name: Build release
       run: cargo build --release
+    - name: Upload Cargo.lock (for reproducible clean checkouts)
+      uses: actions/upload-artifact@v4
+      with:
+        name: cargo-lock
+        path: Cargo.lock
+        if-no-files-found: error
+        retention-days: 30
+    - name: Upload Linux release binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: engram-linux
+        path: target/release/engram
+        if-no-files-found: error
+        retention-days: 30
 
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            binary: target/release/engram.exe
+            artifact: engram-windows
+          - os: macos-latest
+            binary: target/release/engram
+            artifact: engram-macos
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -41,3 +61,10 @@ jobs:
       run: cargo test --all
     - name: Build release
       run: cargo build --release
+    - name: Upload ${{ matrix.artifact }} release binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact }}
+        path: ${{ matrix.binary }}
+        if-no-files-found: error
+        retention-days: 30
