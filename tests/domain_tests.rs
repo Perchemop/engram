@@ -48,10 +48,13 @@ fn simulated_study_career_graduates_a_card() {
     assert_eq!(s2.phase, LearnPhase::Review, "second Good graduates");
 
     // Record the same journey through the library to exercise the log.
-    lib.record_review(card, Grade::Again, t(0)).unwrap();
-    lib.record_review(card, Grade::Good, t(1)).unwrap();
-    lib.record_review(card, Grade::Good, t(11)).unwrap();
-    lib.record_review(card, Grade::Good, t(11 + 60 * 24))
+    lib.record_review(card, Grade::Again, t(0), QueueKind::New)
+        .unwrap();
+    lib.record_review(card, Grade::Good, t(1), QueueKind::Learning)
+        .unwrap();
+    lib.record_review(card, Grade::Good, t(11), QueueKind::Learning)
+        .unwrap();
+    lib.record_review(card, Grade::Good, t(11 + 60 * 24), QueueKind::Learning)
         .unwrap();
     assert_eq!(lib.reviews.len(), 4);
     let final_state = &lib.card(card).unwrap().sched;
@@ -96,9 +99,13 @@ fn lapse_cycle_round_trips_through_relearning() {
 
     // Library path logs both reviews with interval bookkeeping.
     lib.card_mut(card).unwrap().sched = base.clone();
-    let out1 = lib.record_review(card, Grade::Again, now()).unwrap();
+    let out1 = lib
+        .record_review(card, Grade::Again, now(), QueueKind::Review)
+        .unwrap();
     assert_eq!(out1.log.interval_before_days, 50.0);
-    let out2 = lib.record_review(card, Grade::Good, now()).unwrap();
+    let out2 = lib
+        .record_review(card, Grade::Good, now(), QueueKind::Review)
+        .unwrap();
     assert!(out2.log.interval_after_days > 0.0);
     assert_eq!(lib.reviews.len(), 2);
 }
@@ -125,7 +132,8 @@ fn daily_new_limit_counts_introductions_per_day() {
     assert_eq!(s1.total(), 2);
     let answer_time = now() + chrono::Duration::minutes(1);
     for (cid, _) in s1.queue.clone() {
-        lib.record_review(cid, Grade::Good, answer_time).unwrap();
+        lib.record_review(cid, Grade::Good, answer_time, QueueKind::New)
+            .unwrap();
     }
     // Ten minutes later the learning steps come due: both are served
     // (steps are never capped), but no further new cards — today's
@@ -136,7 +144,8 @@ fn daily_new_limit_counts_introductions_per_day() {
     assert!(s2.queue.iter().all(|(_, k)| *k == QueueKind::Learning));
     // Graduate both cards (last-step Good → interval 1 day).
     for (cid, _) in s2.queue.clone() {
-        lib.record_review(cid, Grade::Good, step_due).unwrap();
+        lib.record_review(cid, Grade::Good, step_due, QueueKind::Learning)
+            .unwrap();
     }
     // Tomorrow the budget resets: two more new cards are introduced. The
     // graduated cards are due at 12:11 tomorrow — just after this build —
@@ -164,7 +173,8 @@ fn persistence_roundtrip_on_disk() {
             now(),
         )
         .unwrap();
-    lib.record_review(card, Grade::Good, now()).unwrap();
+    lib.record_review(card, Grade::Good, now(), QueueKind::Review)
+        .unwrap();
 
     engram::data::save_library(&lib, &path).unwrap();
     let loaded = engram::data::load_library(&path).unwrap().unwrap();
@@ -275,7 +285,8 @@ fn full_session_flow_end_to_end() {
     let mut graded = 0;
     while let Some((cid, _)) = session.current() {
         session.answer(Grade::Good, now() + chrono::Duration::seconds(graded * 5));
-        lib.record_review(cid, Grade::Good, now()).unwrap();
+        lib.record_review(cid, Grade::Good, now(), QueueKind::New)
+            .unwrap();
         graded += 1;
     }
     assert!(session.finished);
@@ -301,7 +312,8 @@ fn deleting_everything_leaves_a_usable_library() {
             now(),
         )
         .unwrap();
-    lib.record_review(card, Grade::Good, now()).unwrap();
+    lib.record_review(card, Grade::Good, now(), QueueKind::Review)
+        .unwrap();
     lib.delete_card(card).unwrap();
     lib.delete_deck(deck).unwrap();
     assert!(lib.cards.is_empty());

@@ -314,10 +314,10 @@ impl EngramApp {
 
     pub(crate) fn grade_current(&mut self, grade: Grade) {
         let now = Utc::now();
-        let Some((card_id, _)) = self.session.as_ref().and_then(|s| s.current()) else {
+        let Some((card_id, queue_kind)) = self.session.as_ref().and_then(|s| s.current()) else {
             return;
         };
-        match self.library.record_review(card_id, grade, now) {
+        match self.library.record_review(card_id, grade, now, queue_kind) {
             Ok(_) => {
                 if let Some(session) = self.session.as_mut() {
                     session.answer(grade, now);

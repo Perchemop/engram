@@ -15,8 +15,10 @@ All notable changes to Engram are documented here. Format:
 - Deck/path/ancestor walks are cycle-guarded, so a hand-edited or corrupt
   `.engram.json` can no longer freeze the app; the domain reports sane
   results instead.
-- Daily new/review limits are now counted per calendar day from the review
-  log (learning steps are always served), instead of per session build.
+- Daily new/review limits are now counted per calendar day instead of per
+  session build: the review log records the queue kind of every review
+  (`New` = card introduction), and learning/relearning steps are always
+  served. CSV tags are comma-separated so multi-word tags round-trip.
 - Card/deck/settings dialogs are closed when a library is opened or
   created, so editors can never commit into a stale deck.
 - A failing auto-save backs off (retry every 5s) instead of hammering the

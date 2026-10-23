@@ -228,7 +228,8 @@ mod tests {
         let (mut l, c) = lib_with_card(at(15, 12));
         // Reviews on the 13th, 14th and 15th → streak 3 ending today.
         for day in [13u32, 14, 15] {
-            l.record_review(c, Grade::Good, at(day, 9)).unwrap();
+            l.record_review(c, Grade::Good, at(day, 9), QueueKind::Review)
+                .unwrap();
         }
         let s = compute(&l, at(15, 12), 21.0);
         assert_eq!(s.streak_days, 3);
@@ -240,7 +241,8 @@ mod tests {
     fn streak_survives_an_empty_today() {
         let (mut l, c) = lib_with_card(at(15, 12));
         for day in [13u32, 14] {
-            l.record_review(c, Grade::Good, at(day, 9)).unwrap();
+            l.record_review(c, Grade::Good, at(day, 9), QueueKind::Review)
+                .unwrap();
         }
         let s = compute(&l, at(15, 12), 21.0);
         assert_eq!(s.streak_days, 2);
@@ -249,9 +251,12 @@ mod tests {
     #[test]
     fn retention_excludes_again_grades() {
         let (mut l, c) = lib_with_card(at(15, 12));
-        l.record_review(c, Grade::Again, at(14, 9)).unwrap();
-        l.record_review(c, Grade::Good, at(14, 10)).unwrap();
-        l.record_review(c, Grade::Good, at(14, 11)).unwrap();
+        l.record_review(c, Grade::Again, at(14, 9), QueueKind::Review)
+            .unwrap();
+        l.record_review(c, Grade::Good, at(14, 10), QueueKind::Review)
+            .unwrap();
+        l.record_review(c, Grade::Good, at(14, 11), QueueKind::Review)
+            .unwrap();
         let s = compute(&l, at(15, 12), 21.0);
         assert_eq!(s.retention_30d, Some(2.0 / 3.0));
     }
@@ -283,7 +288,8 @@ mod tests {
     #[test]
     fn stats_serde_roundtrip() {
         let (mut l, c) = lib_with_card(at(15, 12));
-        l.record_review(c, Grade::Good, at(15, 12)).unwrap();
+        l.record_review(c, Grade::Good, at(15, 12), QueueKind::Review)
+            .unwrap();
         let s = compute(&l, at(15, 12), 21.0);
         let json = serde_json::to_string(&s).unwrap();
         let back: LibraryStats = serde_json::from_str(&json).unwrap();

@@ -62,6 +62,10 @@ pub struct ReviewLog {
     pub deck_id: DeckId,
     pub at: DateTime<Utc>,
     pub grade: Grade,
+    /// Which queue part served the card: needed for per-day daily-limit
+    /// accounting (a `New` review is a card introduction).
+    #[serde(default)]
+    pub queue_kind: QueueKind,
     pub interval_before_days: f64,
     pub interval_after_days: f64,
 }
@@ -94,10 +98,11 @@ impl Scope {
     }
 }
 
-/// Which part of the queue an entry belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Which part of the queue an entry belonged to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum QueueKind {
     /// Graduated or lapsed card past its due date.
+    #[default]
     Review,
     /// Card inside a learning/relearning step.
     Learning,
@@ -547,6 +552,7 @@ impl Library {
         card_id: CardId,
         grade: Grade,
         now: DateTime<Utc>,
+        queue_kind: QueueKind,
     ) -> Result<ReviewOutcome, LibraryError> {
         let params = self.settings.sched.clone();
         let card = self
@@ -562,6 +568,7 @@ impl Library {
             deck_id: card.deck_id,
             at: now,
             grade,
+            queue_kind,
             interval_before_days: interval_before,
             interval_after_days: after.interval_days,
         };
@@ -681,17 +688,18 @@ impl Library {
         now: DateTime<Utc>,
     ) -> Result<StudySession, LibraryError> {
         let today = now.date_naive();
-        // First-ever review per card, in log order: cards whose first
-        // review happened today were introduced today.
-        let mut seen_cards: std::collections::HashSet<CardId> = std::collections::HashSet::new();
+        // Cards introduced today (served from the New bucket) and
+        // non-introduction reviews done today.
         let mut introduced_today: std::collections::HashSet<CardId> =
             std::collections::HashSet::new();
         let mut reviews_today = 0usize;
         for r in &self.reviews {
-            if seen_cards.insert(r.card_id) && r.at.date_naive() == today {
-                introduced_today.insert(r.card_id);
+            if r.at.date_naive() != today {
+                continue;
             }
-            if r.at.date_naive() == today && !introduced_today.contains(&r.card_id) {
+            if r.queue_kind == QueueKind::New {
+                introduced_today.insert(r.card_id);
+            } else {
                 reviews_today += 1;
             }
         }
@@ -816,7 +824,8 @@ mod tests {
                 now(),
             )
             .unwrap();
-        l.record_review(card, Grade::Good, now()).unwrap();
+        l.record_review(card, Grade::Good, now(), QueueKind::New)
+            .unwrap();
         assert_eq!(l.delete_deck(mid).unwrap(), 1);
         assert!(l.deck(mid).is_none());
         assert_eq!(l.deck(leaf).unwrap().parent, Some(root));
@@ -895,12 +904,16 @@ mod tests {
                 now(),
             )
             .unwrap();
-        let out = l.record_review(c, Grade::Good, now()).unwrap();
+        let out = l
+            .record_review(c, Grade::Good, now(), QueueKind::Review)
+            .unwrap();
         assert_eq!(out.state_after.phase, LearnPhase::Learning);
         assert_eq!(out.log.card_id, c);
         assert_eq!(out.log.interval_before_days, 0.0);
         assert_eq!(l.reviews.len(), 1);
-        assert!(l.record_review(Uuid::nil(), Grade::Good, now()).is_err());
+        assert!(l
+            .record_review(Uuid::nil(), Grade::Good, now(), QueueKind::Review)
+            .is_err());
     }
 
     #[test]
@@ -926,7 +939,8 @@ mod tests {
         assert_eq!(s1.total(), 2);
         let answer_time = now() + chrono::Duration::minutes(1);
         for (cid, _) in s1.queue.clone() {
-            l.record_review(cid, Grade::Good, answer_time).unwrap();
+            l.record_review(cid, Grade::Good, answer_time, QueueKind::New)
+                .unwrap();
         }
 
         // Session 2, same day: the two learning steps are always served,
@@ -942,7 +956,8 @@ mod tests {
         // Graduating both cards (last-step Good) still yields no new cards
         // today.
         for (cid, _) in s2.queue.clone() {
-            l.record_review(cid, Grade::Good, step_due).unwrap();
+            l.record_review(cid, Grade::Good, step_due, QueueKind::Learning)
+                .unwrap();
         }
         let s3 = l.build_session(Scope::All, step_due);
         assert!(matches!(s3, Err(LibraryError::NothingToStudy)));
@@ -982,7 +997,8 @@ mod tests {
         let (cid, _) = s1.current().unwrap();
         // Answer Again: the card lapses into relearning, and today's review
         // budget is spent.
-        l.record_review(cid, Grade::Again, now()).unwrap();
+        l.record_review(cid, Grade::Again, now(), QueueKind::Review)
+            .unwrap();
         // Ten minutes later (step due): the relearning step is always served,
         // but no further review cards fit today's budget.
         let lapse_time = now() + chrono::Duration::minutes(10);
@@ -1216,7 +1232,8 @@ mod tests {
                 now(),
             )
             .unwrap();
-        l.record_review(c, Grade::Good, now()).unwrap();
+        l.record_review(c, Grade::Good, now(), QueueKind::Review)
+            .unwrap();
         let json = serde_json::to_string(&l).unwrap();
         let back: Library = serde_json::from_str(&json).unwrap();
         assert_eq!(back, l);
