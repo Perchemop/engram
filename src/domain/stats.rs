@@ -172,6 +172,7 @@ pub fn compute(lib: &Library, now: DateTime<Utc>, params_mature_days: f64) -> Li
 mod tests {
     use super::*;
     use crate::domain::card::CardKind;
+    use crate::domain::library::QueueKind;
     use crate::domain::scheduler::SchedulingState;
     use chrono::TimeZone;
 
