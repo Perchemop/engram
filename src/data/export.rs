@@ -4,7 +4,7 @@
 //! `Deck,Type,Front,Back,Tags` with RFC-4180 quoting — quoted fields may
 //! contain commas, quotes (doubled) and embedded newlines. `Type` is
 //! `Basic` or `Cloze`; for Cloze rows the deletion markup lives in `Front`
-//! and `Back` mirrors it. Tags are space-separated.
+//! and `Back` mirrors it. Tags are comma-separated, so a tag that itself contains a comma is not expressible in CSV (it round-trips as two tags).
 
 use std::fs;
 use std::path::Path;
@@ -89,7 +89,7 @@ pub fn export_csv(path: &Path, lib: &Library, scope: Scope) -> Result<usize, Dat
             kind_label,
             csv_field(&front),
             csv_field(&back),
-            csv_field(&card.tags.join(" "))
+            csv_field(&card.tags.join(","))
         ));
         count += 1;
     }
@@ -124,7 +124,7 @@ pub fn import_csv(
         }
         let tags: Vec<String> = fields
             .get(4)
-            .map(|t| t.split_whitespace().map(str::to_string).collect())
+            .map(|t| t.split(',').map(str::trim).map(str::to_string).collect())
             .unwrap_or_default();
         let kind = if kind_label.eq_ignore_ascii_case("cloze") {
             CardKind::Cloze {
@@ -270,7 +270,9 @@ mod tests {
             }
             other => panic!("wrong kind: {other:?}"),
         }
-        assert_eq!(card.tags, vec!["multi", "line"]);
+        // One tag containing a space survives the round-trip: the tags
+        // field splits on commas only.
+        assert_eq!(card.tags, vec!["multi line"]);
         std::fs::remove_file(&path).ok();
     }
 
