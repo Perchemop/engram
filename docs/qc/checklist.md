@@ -88,4 +88,5 @@ CI run.
 
 | Date | Scope | CI run | Outcome |
 |---|---|---|---|
-| 2026-10-23 | Phase 0–3 initial implementation | pending | pending |
+| 2026-10-23 | Phases 0–3 (full V1) | `39889290098` | ✅ Pass — check + Windows + macOS all green; 75 tests passing |
+| 2026-10-22/23 | Compile bring-up (passes 1–6) | `39846764231` → `39889290098` | 5 red runs fixed via CI logs only (see PROGRESS.md) |

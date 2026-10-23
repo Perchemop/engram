@@ -7,7 +7,7 @@ Map of capabilities → implementation → tests. Statuses are honest: a row is
 | ID | Requirement | Status | Trace |
 |---|---|---|---|
 | R-G-001 | Rust only, 100% free OSS deps | DONE | Cargo.toml; ATTRIBUTION.md |
-| R-G-002 | Cross-platform desktop (Linux/macOS/Windows) | DONE (pending CI proof) | eframe/egui; ci.yml matrix |
+| R-G-002 | Cross-platform desktop (Linux/macOS/Windows) | DONE | eframe/egui; ci.yml matrix — **run `39889290098` green on all 3 OSes** |
 | R-G-003 | Offline-first; no accounts/telemetry/network | DONE | no net deps; README |
 | R-G-004 | Original work; clean-room inspiration only | DONE | docs/inspiration.md; ATTRIBUTION.md |
 | R-G-005 | Domain-first, headless-testable | DONE | src/domain has no egui/IO |
