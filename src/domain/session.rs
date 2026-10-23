@@ -174,7 +174,8 @@ mod tests {
         assert_eq!(sum.total, 3);
         assert_eq!(sum.again, 1);
         assert!((sum.retention() - 2.0 / 3.0).abs() < 1e-9);
-        assert_eq!(sum.elapsed_seconds, 180);
+        // t(n) is n seconds past 12:00:00, so the session spanned 3s.
+        assert_eq!(sum.elapsed_seconds, 3);
     }
 
     #[test]

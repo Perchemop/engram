@@ -420,8 +420,10 @@ mod tests {
     #[test]
     fn graduating_from_learning_uses_graduating_interval() {
         let p = params();
+        // New → step 0 (Again) → step 1 (Good) → graduate (last-step Good).
         let stepped = schedule(now(), &p, &new_state(), Grade::Again);
-        let graduated = schedule(now(), &p, &stepped, Grade::Good);
+        let stepped2 = schedule(now(), &p, &stepped, Grade::Good);
+        let graduated = schedule(now(), &p, &stepped2, Grade::Good);
         assert_eq!(graduated.phase, LearnPhase::Review);
         assert_eq!(graduated.interval_days, p.graduating_interval_days);
         assert!((graduated.due - now()).num_hours() <= 24);
@@ -458,7 +460,10 @@ mod tests {
             lapses: 0,
         };
         let s = schedule(now(), &p, &base, Grade::Easy);
-        assert!((s.interval_days - 25.0 * p.easy_bonus).abs() < 1e-9);
+        // Ease is bumped before the interval multiply (SM-2 order), so the
+        // effective ease for this interval is base.ease + delta.
+        let expected = base.interval_days * (base.ease + p.ease_delta_easy) * p.easy_bonus;
+        assert!((s.interval_days - expected).abs() < 1e-9);
     }
 
     #[test]

@@ -18,7 +18,7 @@ pub fn normalise_filename(name: &str) -> String {
     if name.to_lowercase().ends_with(LIBRARY_EXTENSION) {
         name.to_string()
     } else if name.to_lowercase().ends_with(".json") {
-        format!("{}engram.json", &name[..name.len() - 5])
+        format!("{}.engram.json", &name[..name.len() - 5])
     } else {
         format!("{name}.{LIBRARY_EXTENSION}")
     }
