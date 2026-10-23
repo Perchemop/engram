@@ -51,7 +51,7 @@ Map of capabilities → implementation → tests. Statuses are honest: a row is
 | ID | Capability | Status | Implementation | Tests |
 |---|---|---|---|---|
 | R-Q-001 | Deterministic queue: learning → review → new | DONE | library.rs `build_session` | `due_counts_and_session_ordering` |
-| R-Q-002 | Daily limits respected | DONE | library.rs | `daily_new_limit_is_respected_across_sessions` |
+| R-Q-002 | Daily limits respected (per calendar day) | DONE | library.rs `build_session` | `daily_new_limit_counts_introductions_per_day`, `daily_review_limit_caps_due_reviews_per_day` |
 | R-Q-003 | Scope = deck subtree | DONE | library.rs | `scope_respects_subtree` |
 | R-Q-004 | Session walk, answers, summary | DONE | session.rs | `session_walks_the_queue`, `end_early_keeps_summary` |
 | R-Q-005 | Nothing-to-study is a distinct error | DONE | library.rs | `session_on_empty_library_is_an_error`, `nothing_to_study_error_is_distinct` |
@@ -80,8 +80,8 @@ Map of capabilities → implementation → tests. Statuses are honest: a row is
 | R-P-001 | `.engram.json` library roundtrip | DONE | data/store.rs | `library_roundtrips_through_disk`, `persistence_roundtrip_on_disk` |
 | R-P-002 | Atomic writes | DONE | data/store.rs `atomic_write` | (code-reviewed; no partial-write path) |
 | R-P-003 | Missing file → fresh library | DONE | data/store.rs | `missing_library_is_none` |
-| R-P-004 | CSV export/import with quoting | DONE | data/export.rs | `csv_roundtrip`, `csv_header_is_skipped_on_import`, `parse_csv_record_handles_quotes` |
-| R-P-005 | JSON backup export | DONE | data/export.rs | `json_export_roundtrip` |
+| R-P-004 | CSV export/import with quoting (incl. multi-line) | DONE | data/export.rs | `csv_roundtrip`, `csv_roundtrip_survives_multiline_and_quotes`, `csv_records_parse_quoted_fields` |
+| R-P-005 | JSON backup export (atomic) | DONE | data/export.rs | `json_export_roundtrip` |
 | R-P-006 | App preferences (theme) persisted | DONE | data/store.rs `Prefs` | `theme_serde_roundtrip` |
 
 ## UI

@@ -62,6 +62,11 @@ pub struct EngramApp {
     pub(crate) revealed: bool,
     pub(crate) study_scope: Scope,
 
+    // Autosave health: a persistent write failure must not retry every
+    // frame (disk full / read-only dir); retries back off to every 5s.
+    save_failed: bool,
+    last_save_attempt: Option<std::time::Instant>,
+
     // Generate page state.
     pub(crate) gen: generate::GenerateState,
 }
@@ -112,6 +117,8 @@ impl EngramApp {
             session: None,
             revealed: false,
             study_scope: Scope::All,
+            save_failed: false,
+            last_save_attempt: None,
             gen: generate::GenerateState::default(),
         }
     }
@@ -129,30 +136,57 @@ impl EngramApp {
             self.status = "No save location available".to_string();
             return;
         };
+        self.last_save_attempt = Some(std::time::Instant::now());
         match data::save_library(&self.library, &path) {
             Ok(()) => {
                 self.path = Some(path);
                 self.dirty = false;
+                self.save_failed = false;
                 self.status = "Saved".to_string();
                 self.title_dirty = true;
             }
-            Err(e) => self.status = format!("Save failed: {e}"),
+            Err(e) => {
+                self.save_failed = true;
+                self.status = format!("Save failed: {e}");
+            }
         }
     }
 
     /// Auto-save without touching the status bar (errors still surface).
+    /// A failed attempt sets `save_failed` so the caller can back off
+    /// instead of retrying a doomed write every frame.
     fn save_quiet(&mut self) {
         let Some(path) = self.resolve_save_path() else {
             return;
         };
+        self.last_save_attempt = Some(std::time::Instant::now());
         match data::save_library(&self.library, &path) {
             Ok(()) => {
                 self.path = Some(path);
                 self.dirty = false;
+                self.save_failed = false;
                 self.title_dirty = true;
             }
-            Err(e) => self.status = format!("Auto-save failed: {e}"),
+            Err(e) => {
+                self.save_failed = true;
+                self.status = format!("Auto-save failed: {e}");
+            }
         }
+    }
+
+    /// True when the autosave loop should attempt another write now.
+    #[must_use]
+    fn autosave_due(&self) -> bool {
+        if !self.dirty {
+            return false;
+        }
+        if !self.save_failed {
+            return true;
+        }
+        // Back off: retry a failed save at most every 5 seconds.
+        self.last_save_attempt
+            .map(|t| t.elapsed() >= std::time::Duration::from_secs(5))
+            .unwrap_or(true)
     }
 
     fn save_as_action(&mut self) {
@@ -183,6 +217,7 @@ impl EngramApp {
                 Ok(Some(lib)) => {
                     self.library = lib;
                     self.path = Some(path);
+                    self.close_all_dialogs();
                     self.session = None;
                     self.selected_deck = None;
                     self.selected_cards.clear();
@@ -199,6 +234,7 @@ impl EngramApp {
     fn new_library_action(&mut self) {
         self.library = Library::new("My Engram", Utc::now());
         self.path = None;
+        self.close_all_dialogs();
         self.session = None;
         self.selected_deck = None;
         self.selected_cards.clear();
@@ -278,10 +314,10 @@ impl EngramApp {
 
     pub(crate) fn grade_current(&mut self, grade: Grade) {
         let now = Utc::now();
-        let Some((card_id, _)) = self.session.as_ref().and_then(|s| s.current()) else {
+        let Some((card_id, queue_kind)) = self.session.as_ref().and_then(|s| s.current()) else {
             return;
         };
-        match self.library.record_review(card_id, grade, now) {
+        match self.library.record_review(card_id, grade, now, queue_kind) {
             Ok(_) => {
                 if let Some(session) = self.session.as_mut() {
                     session.answer(grade, now);
@@ -308,6 +344,16 @@ impl EngramApp {
         }
         self.session = None;
         self.revealed = false;
+    }
+
+    /// Close every open dialog. Used when a library is opened/created so
+    /// editors can never reference decks from the previous library, and by
+    /// the Esc key.
+    fn close_all_dialogs(&mut self) {
+        self.card_editor = None;
+        self.deck_dialog = None;
+        self.settings_dialog = None;
+        self.confirm_delete_deck = None;
     }
 
     // ------------------------------------------------------------------
@@ -917,9 +963,7 @@ impl App for EngramApp {
                 || self.settings_dialog.is_some();
             if i.key_pressed(egui::Key::Escape) {
                 if dialog_open {
-                    self.card_editor = None;
-                    self.deck_dialog = None;
-                    self.settings_dialog = None;
+                    self.close_all_dialogs();
                 } else if self.page == Page::Study && self.session.is_some() {
                     self.end_session();
                 }
@@ -981,8 +1025,9 @@ impl App for EngramApp {
 
         self.draw_dialogs(ui);
 
-        // Persist promptly: user data must never sit unsaved for long.
-        if self.dirty {
+        // Persist promptly: user data must never sit unsaved for long —
+        // but a failing save backs off instead of retrying every frame.
+        if self.autosave_due() {
             self.save_quiet();
         }
 

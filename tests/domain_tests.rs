@@ -6,7 +6,7 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use engram::domain::{
-    generate_drafts, schedule, Grade, LearnPhase, Library, LibraryError, SchedParams,
+    generate_drafts, schedule, Grade, LearnPhase, Library, LibraryError, QueueKind, SchedParams,
     SchedulingState, Scope,
 };
 use engram::domain::{CardFilter, CardKind};
@@ -48,10 +48,13 @@ fn simulated_study_career_graduates_a_card() {
     assert_eq!(s2.phase, LearnPhase::Review, "second Good graduates");
 
     // Record the same journey through the library to exercise the log.
-    lib.record_review(card, Grade::Again, t(0)).unwrap();
-    lib.record_review(card, Grade::Good, t(1)).unwrap();
-    lib.record_review(card, Grade::Good, t(11)).unwrap();
-    lib.record_review(card, Grade::Good, t(11 + 60 * 24))
+    lib.record_review(card, Grade::Again, t(0), QueueKind::New)
+        .unwrap();
+    lib.record_review(card, Grade::Good, t(1), QueueKind::Learning)
+        .unwrap();
+    lib.record_review(card, Grade::Good, t(11), QueueKind::Learning)
+        .unwrap();
+    lib.record_review(card, Grade::Good, t(11 + 60 * 24), QueueKind::Learning)
         .unwrap();
     assert_eq!(lib.reviews.len(), 4);
     let final_state = &lib.card(card).unwrap().sched;
@@ -96,17 +99,21 @@ fn lapse_cycle_round_trips_through_relearning() {
 
     // Library path logs both reviews with interval bookkeeping.
     lib.card_mut(card).unwrap().sched = base.clone();
-    let out1 = lib.record_review(card, Grade::Again, now()).unwrap();
+    let out1 = lib
+        .record_review(card, Grade::Again, now(), QueueKind::Review)
+        .unwrap();
     assert_eq!(out1.log.interval_before_days, 50.0);
-    let out2 = lib.record_review(card, Grade::Good, now()).unwrap();
+    let out2 = lib
+        .record_review(card, Grade::Good, now(), QueueKind::Review)
+        .unwrap();
     assert!(out2.log.interval_after_days > 0.0);
     assert_eq!(lib.reviews.len(), 2);
 }
 
 #[test]
-fn daily_new_limit_is_respected_across_sessions() {
+fn daily_new_limit_counts_introductions_per_day() {
     let mut lib = Library::new("Limits", now());
-    lib.settings.daily_new_limit = 1;
+    lib.settings.daily_new_limit = 2;
     let deck = lib.decks[0].id;
     for i in 0..5 {
         lib.add_card(
@@ -120,18 +127,33 @@ fn daily_new_limit_is_respected_across_sessions() {
         )
         .unwrap();
     }
-    // Session 1: exactly one new card.
+    // Session 1: exactly two new cards.
     let s1 = lib.build_session(Scope::All, now()).unwrap();
-    assert_eq!(s1.total(), 1);
-    // Answering Good moves the card into learning step 1, due 10 minutes
-    // after the answer — so the next session is built at that later time
-    // and serves the due learning card plus one fresh new card.
-    let (cid, _) = s1.current().unwrap();
-    let answer_time = now() + chrono::Duration::minutes(10);
-    let next_session_time = answer_time + chrono::Duration::minutes(10);
-    lib.record_review(cid, Grade::Good, answer_time).unwrap();
-    let s2 = lib.build_session(Scope::All, next_session_time).unwrap();
-    assert_eq!(s2.total(), 2); // 1 learning (due) + 1 new
+    assert_eq!(s1.total(), 2);
+    let answer_time = now() + chrono::Duration::minutes(1);
+    for (cid, _) in s1.queue.clone() {
+        lib.record_review(cid, Grade::Good, answer_time, QueueKind::New)
+            .unwrap();
+    }
+    // Ten minutes later the learning steps come due: both are served
+    // (steps are never capped), but no further new cards — today's
+    // introductions are used up.
+    let step_due = answer_time + chrono::Duration::minutes(10);
+    let s2 = lib.build_session(Scope::All, step_due).unwrap();
+    assert_eq!(s2.total(), 2);
+    assert!(s2.queue.iter().all(|(_, k)| *k == QueueKind::Learning));
+    // Graduate both cards (last-step Good → interval 1 day).
+    for (cid, _) in s2.queue.clone() {
+        lib.record_review(cid, Grade::Good, step_due, QueueKind::Learning)
+            .unwrap();
+    }
+    // Tomorrow the budget resets: two more new cards are introduced. The
+    // graduated cards are due at 12:11 tomorrow — just after this build —
+    // so only the fresh cards appear.
+    let tomorrow = now() + chrono::Duration::days(1);
+    let s3 = lib.build_session(Scope::All, tomorrow).unwrap();
+    assert_eq!(s3.total(), 2);
+    assert!(s3.queue.iter().all(|(_, k)| *k == QueueKind::New));
 }
 
 #[test]
@@ -151,7 +173,8 @@ fn persistence_roundtrip_on_disk() {
             now(),
         )
         .unwrap();
-    lib.record_review(card, Grade::Good, now()).unwrap();
+    lib.record_review(card, Grade::Good, now(), QueueKind::Review)
+        .unwrap();
 
     engram::data::save_library(&lib, &path).unwrap();
     let loaded = engram::data::load_library(&path).unwrap().unwrap();
@@ -262,7 +285,8 @@ fn full_session_flow_end_to_end() {
     let mut graded = 0;
     while let Some((cid, _)) = session.current() {
         session.answer(Grade::Good, now() + chrono::Duration::seconds(graded * 5));
-        lib.record_review(cid, Grade::Good, now()).unwrap();
+        lib.record_review(cid, Grade::Good, now(), QueueKind::New)
+            .unwrap();
         graded += 1;
     }
     assert!(session.finished);
@@ -288,7 +312,8 @@ fn deleting_everything_leaves_a_usable_library() {
             now(),
         )
         .unwrap();
-    lib.record_review(card, Grade::Good, now()).unwrap();
+    lib.record_review(card, Grade::Good, now(), QueueKind::Review)
+        .unwrap();
     lib.delete_card(card).unwrap();
     lib.delete_deck(deck).unwrap();
     assert!(lib.cards.is_empty());

@@ -1,9 +1,10 @@
 //! CSV import/export for deck exchange, plus whole-library JSON export.
 //!
 //! CSV format (our own, documented):
-//! `Deck,Type,Front,Back,Tags` with RFC-4180 quoting. `Type` is `Basic` or
-//! `Cloze`; for Cloze rows the deletion markup lives in `Front` and `Back`
-//! mirrors it. Tags are space-separated.
+//! `Deck,Type,Front,Back,Tags` with RFC-4180 quoting — quoted fields may
+//! contain commas, quotes (doubled) and embedded newlines. `Type` is
+//! `Basic` or `Cloze`; for Cloze rows the deletion markup lives in `Front`
+//! and `Back` mirrors it. Tags are comma-separated, so a tag that itself contains a comma is not expressible in CSV (it round-trips as two tags).
 
 use std::fs;
 use std::path::Path;
@@ -11,7 +12,8 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 
 use crate::data::error::DataError;
-use crate::domain::card::{CardId, CardKind};
+use crate::data::store::atomic_write;
+use crate::domain::card::CardKind;
 use crate::domain::deck::DeckId;
 use crate::domain::library::{CardFilter, Library, Scope};
 
@@ -27,35 +29,44 @@ fn csv_field(s: &str) -> String {
     }
 }
 
-/// Parse one CSV record (already unquoted). Used by tests and the importer.
-fn parse_csv_record(line: &str) -> Vec<String> {
-    let mut fields = Vec::new();
+/// Parse RFC-4180 records: quote-aware, so commas and newlines inside
+/// quoted fields stay part of the field and `""` unescapes to `"`.
+fn csv_records(text: &str) -> Vec<Vec<String>> {
+    let mut records: Vec<Vec<String>> = Vec::new();
+    let mut fields: Vec<String> = Vec::new();
     let mut current = String::new();
-    let mut chars = line.chars().peekable();
+    let mut in_quotes = false;
+    let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
-        match c {
-            '"' => {
-                while let Some(c2) = chars.next() {
-                    if c2 == '"' {
-                        if chars.peek() == Some(&'"') {
-                            current.push('"');
-                            chars.next();
-                        } else {
-                            break;
-                        }
-                    } else {
-                        current.push(c2);
-                    }
+        if in_quotes {
+            if c == '"' {
+                if chars.peek() == Some(&'"') {
+                    current.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = false;
                 }
+            } else {
+                current.push(c);
             }
-            ',' => {
-                fields.push(std::mem::take(&mut current));
+        } else {
+            match c {
+                '"' => in_quotes = true,
+                ',' => fields.push(std::mem::take(&mut current)),
+                '\r' => {}
+                '\n' => {
+                    fields.push(std::mem::take(&mut current));
+                    records.push(std::mem::take(&mut fields));
+                }
+                _ => current.push(c),
             }
-            _ => current.push(c),
         }
     }
-    fields.push(current);
-    fields
+    if !current.is_empty() || !fields.is_empty() {
+        fields.push(current);
+        records.push(fields);
+    }
+    records
 }
 
 /// Export the cards of `scope` as CSV. Returns the number of card rows.
@@ -63,27 +74,26 @@ fn parse_csv_record(line: &str) -> Vec<String> {
 /// # Errors
 /// [`DataError`] on IO failure.
 pub fn export_csv(path: &Path, lib: &Library, scope: Scope) -> Result<usize, DataError> {
-    let mut rows = vec![CSV_HEADER.to_string()];
-    let ids: Vec<CardId> = lib.cards_in_scope(scope).iter().map(|c| c.id).collect();
+    let mut out = String::from(CSV_HEADER);
+    out.push('\n');
     let mut count = 0usize;
-    for id in ids {
-        let card = lib.card(id).expect("id from cards_in_scope exists");
+    for card in lib.cards_in_scope(scope) {
         let deck = lib.deck_display_name(card.deck_id).unwrap_or_default();
         let (kind_label, front, back) = match &card.kind {
             CardKind::Basic { front, back } => ("Basic", front.clone(), back.clone()),
             CardKind::Cloze { text } => ("Cloze", text.clone(), text.clone()),
         };
-        rows.push(format!(
-            "{},{},{},{},{}",
+        out.push_str(&format!(
+            "{},{},{},{},{}\n",
             csv_field(&deck),
             kind_label,
             csv_field(&front),
             csv_field(&back),
-            csv_field(&card.tags.join(" "))
+            csv_field(&card.tags.join(","))
         ));
         count += 1;
     }
-    fs::write(path, format!("{}\n", rows.join("\n")))?;
+    atomic_write(path, &out)?;
     Ok(count)
 }
 
@@ -91,8 +101,7 @@ pub fn export_csv(path: &Path, lib: &Library, scope: Scope) -> Result<usize, Dat
 /// present. Returns the number of imported cards.
 ///
 /// # Errors
-/// [`DataError`] on IO/parse failure; [`crate::domain::LibraryError`]
-/// propagated from card creation (invalid rows are skipped, not fatal).
+/// [`DataError`] on IO/parse failure. Invalid rows are skipped, not fatal.
 pub fn import_csv(
     path: &Path,
     lib: &mut Library,
@@ -101,12 +110,7 @@ pub fn import_csv(
 ) -> Result<usize, DataError> {
     let text = fs::read_to_string(path)?;
     let mut imported = 0usize;
-    for line in text.lines() {
-        let line = line.trim_end_matches('\r');
-        if line.is_empty() {
-            continue;
-        }
-        let fields = parse_csv_record(line);
+    for fields in csv_records(&text) {
         if fields.len() < 3 {
             continue;
         }
@@ -120,7 +124,7 @@ pub fn import_csv(
         }
         let tags: Vec<String> = fields
             .get(4)
-            .map(|t| t.split_whitespace().map(str::to_string).collect())
+            .map(|t| t.split(',').map(str::trim).map(str::to_string).collect())
             .unwrap_or_default();
         let kind = if kind_label.eq_ignore_ascii_case("cloze") {
             CardKind::Cloze {
@@ -140,12 +144,13 @@ pub fn import_csv(
     Ok(imported)
 }
 
-/// Export the whole library as pretty JSON (a portable backup).
+/// Export the whole library as pretty JSON (a portable backup). Atomic, so
+/// a crash mid-write can never truncate an existing backup.
 ///
 /// # Errors
 /// [`DataError`] on failure.
 pub fn export_json(path: &Path, lib: &Library) -> Result<(), DataError> {
-    fs::write(path, serde_json::to_string_pretty(lib)?).map_err(DataError::from)
+    atomic_write(path, &serde_json::to_string_pretty(lib)?)
 }
 
 /// Number of cards matching a plain-text preview of a scope (used by the
@@ -216,7 +221,6 @@ mod tests {
     #[test]
     fn csv_roundtrip() {
         let lib = sample();
-        let deck = lib.decks[0].id;
         let path = std::env::temp_dir().join(format!("engram_export_{}.csv", uuid::Uuid::new_v4()));
         let n = export_csv(&path, &lib, Scope::All).unwrap();
         assert_eq!(n, 3);
@@ -234,7 +238,41 @@ mod tests {
             .iter()
             .any(|c| matches!(c.kind, CardKind::Cloze { .. })));
         assert!(cards.iter().any(|c| c.tags.contains(&"chem".to_string())));
-        let _ = deck;
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn csv_roundtrip_survives_multiline_and_quotes() {
+        let mut lib = Library::new("Multi", now());
+        let deck = lib.decks[0].id;
+        lib.add_card(
+            deck,
+            CardKind::Basic {
+                front: "line one\nline two".into(),
+                back: "He said \"hi\", then left,\nand returned".into(),
+            },
+            vec!["multi line".into()],
+            now(),
+        )
+        .unwrap();
+
+        let path = std::env::temp_dir().join(format!("engram_multi_{}.csv", uuid::Uuid::new_v4()));
+        assert_eq!(export_csv(&path, &lib, Scope::All).unwrap(), 1);
+
+        let mut target = Library::new("Target", now());
+        let tdeck = target.decks[0].id;
+        assert_eq!(import_csv(&path, &mut target, tdeck, now()).unwrap(), 1);
+        let card = &target.cards[0];
+        match &card.kind {
+            CardKind::Basic { front, back } => {
+                assert_eq!(front, "line one\nline two");
+                assert_eq!(back, "He said \"hi\", then left,\nand returned");
+            }
+            other => panic!("wrong kind: {other:?}"),
+        }
+        // One tag containing a space survives the round-trip: the tags
+        // field splits on commas only.
+        assert_eq!(card.tags, vec!["multi line"]);
         std::fs::remove_file(&path).ok();
     }
 
@@ -250,10 +288,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_csv_record_handles_quotes() {
+    fn csv_records_parse_quoted_fields() {
         assert_eq!(
-            parse_csv_record(r#""a, b","He said ""hi""",c"#),
-            vec!["a, b", "He said \"hi\"", "c"]
+            csv_records("\"a, b\",\"He said \"\"hi\"\"\",c\nplain,second\n"),
+            vec![vec!["a, b", "He said \"hi\"", "c"], vec!["plain", "second"]]
+        );
+        // Multi-line quoted field stays one record.
+        assert_eq!(
+            csv_records("\"one\ntwo\",x\ny,z\n"),
+            vec![vec!["one\ntwo", "x"], vec!["y", "z"]]
         );
     }
 

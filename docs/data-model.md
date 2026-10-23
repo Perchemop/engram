@@ -67,6 +67,7 @@ interval `1.0d` · easy interval `4.0d` · starting ease `2.5` · easy bonus
 | id, card_id, deck_id | identity |
 | at | UTC timestamp of the answer |
 | grade | Again/Hard/Good/Easy |
+| queue_kind | Review / Learning / New — which queue part served the card; `New` marks a card introduction (used by per-day limits). `#[serde(default)]` so older files load as `Review` |
 | interval_before_days / interval_after_days | audit of the interval change |
 
 ## App prefs (separate file, `prefs.json`)

@@ -46,9 +46,13 @@ Vertical slices, per the guide (§8). Statuses: ☐ todo · ◐ partial · ☑ d
 - [x] Procedural app icon; violet dark/light theme.
 
 ## Phase 4 — Verification and hardening (Slice 4)
-- [ ] CI green on all three OS runners (first run pending).
-- [ ] Reviewer pass over the full diff.
-- [ ] Manual QC checklist walked (UI spot-checks on Linux build).
+- [x] CI green on all three OS runners — run `39889290098`.
+- [x] Reviewer pass over the full diff (2026-10-23) — findings fixed:
+      CSV multi-line round-trip (HIGH), per-day limits (MEDIUM), data-layer
+      panic + O(n²) export, cycle-termination guards, autosave backoff,
+      dialog leakage across library switches, atomic backup export.
+- [ ] Re-verify the fix slice on CI (`opencode/ci` PR, then merge — D-013).
+- [ ] Manual QC checklist walked (UI spot-checks on a CI release binary).
 - [ ] Traceability table completed with test evidence.
 
 ## Phase 5 — Post-V1 backlog (explicitly deferred)

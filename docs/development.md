@@ -20,16 +20,28 @@
 ## Slice workflow (guide §8)
 
 1. Pick the next unfinished vertical slice (`PROGRESS.md`).
-2. Implement via the subagent pipeline in `.opencode/agents/`:
-   `domain-dev` (types + unit tests) → `test-writer` → `ui-dev` →
-   `reviewer` (read-only) → `docs-writer` → `fixer` (fmt/clippy/test
-   failures). Subagents never commit or push; the parent agent does.
-3. `cargo fmt --all`, commit a small focused slice, push to `main`.
-4. Watch CI (`gh run view <id>`): fmt → clippy `-D warnings` →
-   `cargo test --all` (3 OSes) → release build. Route failures to `fixer`.
-5. Record exact results in `PROGRESS.md` / `CHANGELOG.md`; update
-   `REQUIREMENTS_TRACEABILITY.md`. Never claim a feature is done before CI
-   is green (guide §9).
+2. **Chat (plan):** the orchestrator writes the Task brief — requirement
+   IDs, files likely touched, acceptance criteria, definition of done.
+3. **Task (execute):** Coder implements the small slice and its tests, runs
+   `cargo fmt --all`, then `ci-runner` executes
+   `~/.config/opencode/scripts/ci.sh run "<description>"`, which commits
+   the tree, pushes the `opencode/ci` branch, opens/updates a **pull
+   request**, and waits for the checks.
+4. Watch CI: fmt → clippy `-D warnings` → `cargo test --all` (3 OSes) →
+   release build. Route failures to `fixer` and repeat.
+5. **Review:** the reviewer subagent checks the PR diff.
+6. **Merge:** with CI green and review done, the orchestrator merges the PR
+   (owner delegated merge authority — DECISIONS.md D-013), then updates the
+   tracking files with **exact** CI results. Never claim a feature is done
+   before CI is green (guide §9).
+
+## Definition of Done (per slice)
+
+Guide §8: requirements implemented; tests cover normal behaviour, validation
+and important failures; committed and pushed; GitHub Actions CI green;
+PR opened/updated for review (merged when green — D-013); tracking docs
+updated; no fake success states; change small and reviewable; no heavy work
+on the local machine.
 
 ## Testing
 

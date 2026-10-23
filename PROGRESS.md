@@ -35,12 +35,32 @@ CI logs:
 6. **Pass 6:** daily-limit test didn't account for the learning step's
    +10-minute due offset.
 
+### Reviewer pass (2026-10-23) and its fixes
+Findings, all fixed and awaiting CI verification on the `opencode/ci` PR:
+
+| Sev | Finding | Fix |
+|---|---|---|
+| HIGH | CSV round-trip corrupts multi-line/quoted card content | quote-aware record scanner in `data::export` + regression test |
+| MED | daily limits were per session-build, not per day | per-calendar-day accounting from the review log (D-014) + tests |
+| MED-LOW | panic + O(n²) in CSV export | single-pass export, no `expect` |
+| LOW-MED | deck-path/ancestor walks could freeze on corrupt cycles | guards + unit test |
+| LOW | autosave retried every frame while failing | 5s backoff, explicit Save stays immediate |
+| LOW | dialogs survived Open/New library | dialogs closed on library switch |
+| LOW | JSON backup export was non-atomic | atomic temp+rename |
+| nit | numpad keys | void — egui has no numpad key variants |
+
+### Process change (2026-10-23)
+The guide was updated to the CTO.new model (Chat → Task → PR → merge).
+Engram adopted it: agent roles aligned (`orchestrator`/`coder`/`explorer`/
+`reviewer`), `AGENTS.md` / `docs/development.md` rewritten, and the owner
+delegated merge authority (D-013) — PRs merge when CI is green.
+
 ### Open items (next session)
-1. Reviewer subagent pass over the full diff (guide §8 / development.md
-   pipeline) — recorded here when done.
-2. Manual QC walk of `docs/qc/checklist.md` UI sections on a real binary
+1. Manual QC walk of `docs/qc/checklist.md` UI sections on a real binary
    (download the release artefact from CI; no local builds).
-3. Clone the CI-generated `Cargo.lock` back into the repo.
+2. Clone the CI-generated `Cargo.lock` back into the repo.
+3. Deferred from review: per-frame recomputation of deck summaries /
+   filtered ids (fine at current scale; memoise if libraries grow).
 
 ---
 
