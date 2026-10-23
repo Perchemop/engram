@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 
 use crate::data::error::DataError;
 use crate::data::store::atomic_write;
-use crate::domain::card::{CardId, CardKind};
+use crate::domain::card::CardKind;
 use crate::domain::deck::DeckId;
 use crate::domain::library::{CardFilter, Library, Scope};
 

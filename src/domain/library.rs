@@ -696,9 +696,9 @@ impl Library {
             }
         }
         let fresh_budget =
-            usize::from(self.settings.daily_new_limit).saturating_sub(introduced_today.len());
+            (self.settings.daily_new_limit as usize).saturating_sub(introduced_today.len());
         let review_budget =
-            usize::from(self.settings.daily_reviews_limit).saturating_sub(reviews_today);
+            (self.settings.daily_reviews_limit as usize).saturating_sub(reviews_today);
         let mut learning: Vec<(DateTime<Utc>, CardId)> = Vec::new();
         let mut review: Vec<(DateTime<Utc>, CardId)> = Vec::new();
         let mut fresh: Vec<CardId> = Vec::new();
@@ -944,7 +944,7 @@ mod tests {
         for (cid, _) in s2.queue.clone() {
             l.record_review(cid, Grade::Good, step_due).unwrap();
         }
-        let s3 = l.build_session(Scope::All, step_due).unwrap();
+        let s3 = l.build_session(Scope::All, step_due);
         assert!(matches!(s3, Err(LibraryError::NothingToStudy)));
 
         // Tomorrow the budget resets: two more new cards.
