@@ -123,12 +123,14 @@ fn daily_new_limit_is_respected_across_sessions() {
     // Session 1: exactly one new card.
     let s1 = lib.build_session(Scope::All, now()).unwrap();
     assert_eq!(s1.total(), 1);
-    // Answering it moves it to learning; ten minutes later the step is due,
-    // so the next session serves that card plus one fresh new card.
+    // Answering Good moves the card into learning step 1, due 10 minutes
+    // after the answer — so the next session is built at that later time
+    // and serves the due learning card plus one fresh new card.
     let (cid, _) = s1.current().unwrap();
-    let later = now() + chrono::Duration::minutes(10);
-    lib.record_review(cid, Grade::Good, later).unwrap();
-    let s2 = lib.build_session(Scope::All, later).unwrap();
+    let answer_time = now() + chrono::Duration::minutes(10);
+    let next_session_time = answer_time + chrono::Duration::minutes(10);
+    lib.record_review(cid, Grade::Good, answer_time).unwrap();
+    let s2 = lib.build_session(Scope::All, next_session_time).unwrap();
     assert_eq!(s2.total(), 2); // 1 learning (due) + 1 new
 }
 
