@@ -29,11 +29,17 @@ pub fn normalise_filename(name: &str) -> String {
 #[serde(default)]
 pub struct Prefs {
     pub theme: Theme,
+    /// Unix seconds of the last automatic update check (24h cache, guide
+    /// §7.2 "no API abuse").
+    pub last_update_check_secs: Option<i64>,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { theme: Theme::Dark }
+        Self {
+            theme: Theme::Dark,
+            last_update_check_secs: None,
+        }
     }
 }
 

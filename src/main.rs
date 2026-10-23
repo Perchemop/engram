@@ -3,9 +3,13 @@
 use eframe::{egui, NativeOptions, Result};
 
 use engram::ui::{icon, theme};
-use engram::{data, EngramApp};
+use engram::{crash_report, data, EngramApp};
 
 fn main() -> Result {
+    // Panic hook first: every later failure leaves a user-consent report
+    // on disk instead of vanishing (guide §6.1 crash stub, §7.1).
+    crash_report::install();
+
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_target(false)

@@ -112,3 +112,28 @@ log; learning/relearning steps are always served (capping them would strand
 cards mid-step). No schema change was needed — first-review data already
 exists in the log. *Rejected:* adding a `was_new` field (redundant; the log
 already records first reviews; a compat default would add noise).
+
+---
+
+## 2026-10-24
+
+### D-015 — Crash report + update check as in-app modules (guide §6.1/§7)
+The updated guide makes a crash stub and update-check stub **v0.1.0 hard
+gates** and prescribes shared suite crates (`crates/crash-report`,
+`update-check`) for *suite* apps. Engram is a standalone app today, so both
+capabilities ship as in-app modules — `src/crash_report.rs` and
+`src/update_check.rs` — with clean, dependency-light APIs designed to be
+lifted into shared crates if a suite forms. Crash reports stay local until
+the user clicks; submission is a pre-filled GitHub issue URL (no embedded
+tokens, ever). Update checks hit the public Releases API at most once per
+24h and fail soft offline. *Rejected:* shipping only placeholder stubs
+(the real behaviour is small, testable, and guide §7 specifies it);
+embedding a bot token (§2.5 forbids); creating two extra crates for a
+single app (premature).
+
+### D-016 — v0.1.0 tagged from the guide's hard-gate checklist
+Version stays `0.1.0` (Cargo.toml already matched). The tag is cut only
+after: CI green on 4 platforms, CHANGELOG `## [0.1.0]` entry written,
+crash + update-check implemented, legal baseline present (LICENSE,
+ATTRIBUTION, no secrets), and `release.yml` verified to publish the GitHub
+Release with per-platform binaries + SHA-256 checksums.

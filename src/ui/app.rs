@@ -7,9 +7,11 @@ use eframe::{App, Frame};
 use egui::{Align, Layout, RichText, Ui};
 use uuid::Uuid;
 
+use crate::crash_report;
 use crate::data::{self, Prefs};
 use crate::domain::{CardFilter, CardId, DeckColor, Grade, Library, Scope, StudySession, Theme};
 use crate::ui::{decks, editor, generate, stats, study, theme};
+use crate::update_check;
 
 /// Top-level pages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +69,13 @@ pub struct EngramApp {
     save_failed: bool,
     last_save_attempt: Option<std::time::Instant>,
 
+    // Crash reporting: a report from a previous run, awaiting user consent
+    // (guide §7.1 — nothing is sent without an explicit click).
+    pending_crash: Option<crash_report::CrashReport>,
+    // Update check: background check result channel + last known status.
+    update_rx: Option<std::sync::mpsc::Receiver<update_check::UpdateStatus>>,
+    update_status: Option<update_check::UpdateStatus>,
+
     // Generate page state.
     pub(crate) gen: generate::GenerateState,
 }
@@ -77,6 +86,22 @@ impl EngramApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let prefs = data::load_prefs();
         theme::apply_theme(&cc.egui_ctx, prefs.theme);
+
+        // Automatic 24-hour update check (guide §7.2): background thread,
+        // result polled on the UI thread, fails soft offline.
+        let mut prefs = prefs;
+        let mut update_rx = None;
+        if update_check::should_auto_check(prefs.last_update_check_secs, update_check::now_secs()) {
+            prefs.last_update_check_secs = Some(update_check::now_secs());
+            let _ = data::save_prefs(&prefs);
+            let (tx, rx) = std::sync::mpsc::channel();
+            update_rx = Some(rx);
+            let ctx = cc.egui_ctx.clone();
+            std::thread::spawn(move || {
+                let _ = tx.send(update_check::check_now());
+                ctx.request_repaint();
+            });
+        }
 
         let (library, path, status) = match data::default_library_path() {
             Some(p) => match data::load_library(&p) {
@@ -119,6 +144,9 @@ impl EngramApp {
             study_scope: Scope::All,
             save_failed: false,
             last_save_attempt: None,
+            pending_crash: crash_report::pending_report(),
+            update_rx,
+            update_status: None,
             gen: generate::GenerateState::default(),
         }
     }
@@ -357,6 +385,53 @@ impl EngramApp {
     }
 
     // ------------------------------------------------------------------
+    // Update check (guide §7.2)
+    // ------------------------------------------------------------------
+
+    /// Spawn a background update check; the result arrives on a channel the
+    /// UI polls, so the network never blocks a frame. Fails soft.
+    fn spawn_update_check(&mut self, ctx: &egui::Context, automatic: bool) {
+        if self.update_rx.is_some() {
+            return; // a check is already in flight
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.update_rx = Some(rx);
+        if automatic {
+            self.prefs.last_update_check_secs = Some(update_check::now_secs());
+            let _ = data::save_prefs(&self.prefs);
+            self.status = "Checking for updates…".to_string();
+        }
+        std::thread::spawn(move || {
+            let status = update_check::check_now();
+            // The receiver may be gone (app closed) — that is fine.
+            let _ = tx.send(status);
+            ctx.request_repaint();
+        });
+    }
+
+    fn poll_update_check(&mut self) {
+        if let Some(rx) = &self.update_rx {
+            if let Ok(status) = rx.try_recv() {
+                self.update_status = Some(status);
+                self.update_rx = None;
+                match &self.update_status {
+                    Some(update_check::UpdateStatus::Available { latest, .. }) => {
+                        self.status = format!("Update available: {latest}");
+                    }
+                    Some(update_check::UpdateStatus::UpToDate) => {
+                        self.status =
+                            format!("You are up to date (v{})", update_check::current_version());
+                    }
+                    Some(update_check::UpdateStatus::Unknown(reason)) => {
+                        self.status = format!("Update check unavailable: {reason}");
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Theme
     // ------------------------------------------------------------------
 
@@ -529,6 +604,45 @@ impl EngramApp {
                 }
             });
             ui.menu_button("Help", |ui| {
+                if ui.button("Check for updates").clicked() {
+                    self.spawn_update_check(ui.ctx(), false);
+                    ui.close();
+                }
+                if let Some(status) = &self.update_status {
+                    ui.separator();
+                    match status {
+                        update_check::UpdateStatus::UpToDate => {
+                            ui.label(format!(
+                                "You are up to date (v{})",
+                                update_check::current_version()
+                            ));
+                        }
+                        update_check::UpdateStatus::Available { latest, url } => {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("Update available: {latest}"));
+                                if ui.button("Open release page").clicked() {
+                                    ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                                }
+                            });
+                        }
+                        update_check::UpdateStatus::Unknown(reason) => {
+                            ui.label(
+                                RichText::new(format!("Update check unavailable: {reason}")).weak(),
+                            );
+                        }
+                    }
+                }
+                ui.separator();
+                ui.label(format!("Engram v{}", update_check::current_version()));
+                ui.label(format!("Running on {}", crash_report::os_description()));
+                ui.label("Free, open-source, offline-first.");
+                if ui.button("Project page").clicked() {
+                    ui.ctx().open_url(egui::OpenUrl::new_tab(format!(
+                        "https://github.com/{}/releases",
+                        crash_report::GITHUB_REPO
+                    )));
+                }
+                ui.separator();
                 ui.label("Keyboard shortcuts:");
                 ui.label("Ctrl+S — save");
                 ui.label("Space / Enter — show answer");
@@ -607,6 +721,19 @@ impl EngramApp {
                 .show(ui.ctx(), |ui| self.deck_dialog_window(ui));
             if !open {
                 self.deck_dialog = None;
+            }
+        }
+
+        // Crash-report consent dialog (guide §7.1: preview + cancel).
+        if self.pending_crash.is_some() {
+            let mut open = true;
+            egui::Window::new("Engram closed unexpectedly")
+                .open(&mut open)
+                .resizable(true)
+                .default_width(560.0)
+                .show(ui.ctx(), |ui| self.crash_dialog_window(ui));
+            if !open {
+                self.pending_crash = None;
             }
         }
 
@@ -814,6 +941,44 @@ impl EngramApp {
         }
     }
 
+    fn crash_dialog_window(&mut self, ui: &mut Ui) {
+        let Some(report) = self.pending_crash.clone() else {
+            return;
+        };
+        ui.label(
+            RichText::new(
+                "Engram hit an unexpected error in a previous session. The report below was generated locally — nothing has been sent. You can review it, submit it to GitHub, or discard it.",
+            )
+            .weak(),
+        );
+        ui.add_space(6.0);
+        egui::ScrollArea::vertical()
+            .max_height(220.0)
+            .show(ui, |ui| {
+                ui.label(RichText::new(&report.body).monospace().size(11.0));
+            });
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            if ui.button("Open GitHub issue").clicked() {
+                let url = crash_report::build_issue_url(&report);
+                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                self.pending_crash = None;
+                crash_report::discard();
+                self.status =
+                    "Crash report: opening GitHub (sign-in happens in your browser)".to_string();
+            }
+            if ui.button("Copy report").clicked() {
+                ui.ctx().copy_text(report.body.clone());
+                self.status = "Crash report copied to clipboard".to_string();
+            }
+            if ui.button("Discard").clicked() {
+                crash_report::discard();
+                self.pending_crash = None;
+                self.status = "Crash report discarded".to_string();
+            }
+        });
+    }
+
     fn settings_dialog_window(&mut self, ui: &mut Ui) {
         let mut apply = false;
         let mut cancel = false;
@@ -991,6 +1156,7 @@ impl App for EngramApp {
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
+        self.poll_update_check();
         if self.title_dirty {
             let title = match &self.path {
                 Some(p) => format!(

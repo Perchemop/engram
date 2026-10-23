@@ -84,6 +84,24 @@ Map of capabilities → implementation → tests. Statuses are honest: a row is
 | R-P-005 | JSON backup export (atomic) | DONE | data/export.rs | `json_export_roundtrip` |
 | R-P-006 | App preferences (theme) persisted | DONE | data/store.rs `Prefs` | `theme_serde_roundtrip` |
 
+## Crash reporting (guide §7.1)
+| ID | Capability | Status | Implementation | Tests |
+|---|---|---|---|---|
+| R-CR-001 | Panic hook persists a scrubbed report | DONE | crash_report.rs `install/format_report` | `format_report_contains_headers_and_scrubs` |
+| R-CR-002 | Home paths scrubbed from backtraces | DONE | crash_report.rs `scrub_paths` | `scrub_replaces_home_directory` |
+| R-CR-003 | User-consent dialog: review / copy / submit / discard | DONE | ui/app.rs crash dialog | `pending_report_roundtrip_and_missing` |
+| R-CR-004 | Pre-filled GitHub issue URL, no embedded tokens | DONE | crash_report.rs `build_issue_url` | `issue_url_carries_title_body_labels` |
+| R-CR-005 | Privacy documented in README | DONE | README §Privacy | (docs) |
+
+## Update check (guide §7.2)
+| ID | Capability | Status | Implementation | Tests |
+|---|---|---|---|---|
+| R-UC-001 | Query GitHub Releases API with UA + Accept headers | DONE | update_check.rs `fetch_latest_tag` | `parse_tag_name_reads_github_payload` (offline part) |
+| R-UC-002 | Semver compare, current vs latest tag | DONE | update_check.rs `classify` | `classify_knows_up_to_date_and_available`, `classify_fails_soft_on_garbage` |
+| R-UC-003 | Fail soft offline / API errors → Unknown | DONE | update_check.rs `check_now` | covered by classify + parse tests |
+| R-UC-004 | 24h auto-check cache, no API abuse | DONE | update_check.rs `should_auto_check` + Prefs | `auto_check_respects_the_24h_cache` |
+| R-UC-005 | UI: up to date / update available + link | DONE | ui/app.rs Help menu | (UI; manual QC) |
+
 ## UI
 | ID | Capability | Status | Implementation | Tests |
 |---|---|---|---|---|
