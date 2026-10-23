@@ -141,7 +141,7 @@ pub fn summarise_forest(
         children.entry(d.parent).or_default().push(d);
     }
     for siblings in children.values_mut() {
-        siblings.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        siblings.sort_by_key(|a| a.name.to_lowercase());
     }
 
     let mut out = Vec::with_capacity(decks.len());

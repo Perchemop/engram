@@ -53,18 +53,21 @@ pub fn generate_drafts(text: &str) -> Vec<DraftCard> {
         // Q:/A: pairs.
         if let Some(q) = line.strip_prefix("Q:").or_else(|| line.strip_prefix("q:")) {
             let q = q.trim();
-            // The answer may be on the same line ("Q: x — A: y") or next.
-            let a = match line.find("A:").or_else(|| line.find("a:")) {
-                Some(pos) if pos > 2 => line[pos + 2..].trim().to_string(),
-                _ => lines
-                    .get(i)
-                    .and_then(|n| n.trim().strip_prefix("A:").map(str::trim))
-                    .map(str::to_string)
-                    .map(|a| {
+            // The answer may be on the same line ("Q: x — A: y") or the next one.
+            let same_line = line
+                .find("A:")
+                .or_else(|| line.find("a:"))
+                .filter(|&pos| pos > 2);
+            let a = if let Some(pos) = same_line {
+                line[pos + 2..].trim().to_string()
+            } else {
+                match lines.get(i).and_then(|n| n.trim().strip_prefix("A:")) {
+                    Some(next) => {
                         i += 1;
-                        a
-                    })
-                    .unwrap_or_default(),
+                        next.trim().to_string()
+                    }
+                    None => String::new(),
+                }
             };
             if !q.is_empty() && !a.is_empty() {
                 push_draft(

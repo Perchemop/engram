@@ -675,8 +675,8 @@ impl Library {
             }
         }
 
-        learning.sort_by(|a, b| a.0.cmp(&b.0));
-        review.sort_by(|a, b| a.0.cmp(&b.0));
+        learning.sort_by_key(|a| a.0);
+        review.sort_by_key(|a| a.0);
         learning.truncate(self.settings.daily_reviews_limit.max(1) as usize);
         review.truncate(self.settings.daily_reviews_limit as usize);
         fresh.truncate(self.settings.daily_new_limit as usize);
