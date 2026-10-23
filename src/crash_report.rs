@@ -221,7 +221,7 @@ mod tests {
         assert!(url.starts_with(NEW_ISSUE_URL));
         assert!(url.contains("title=Crash%3A%20bad%20math"));
         assert!(url.contains("body=line%20one%0Aline%20two"));
-        assert!(url.contains("labels=crash%2Cbug"));
+        assert!(url.contains("labels=crash,bug"));
     }
 
     #[test]
