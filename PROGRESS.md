@@ -33,12 +33,19 @@ CI bring-up history for this slice: 5 red runs fixed from logs only
 `39934841977` 2 test-expectation bugs → `39937012627` missing test import →
 `39937293771` CSV tag expectation → `39938361670` green).
 
+### PRs #2/#3 — CI artefacts and lockfile (2026-10-23)
+- **PR #2 merged** (CI `39942963880`): every CI run now uploads the release
+  binary per OS (`engram-linux` / `engram-windows` / `engram-macos`) and the
+  generated `Cargo.lock`.
+- **PR #3 merged** (CI `39945498142`): `Cargo.lock` committed to the repo —
+  a clean checkout builds the exact verified dependency set (guide §1).
+- Post-merge `main` CI: `39946756653` green.
+
 ### Open items (next session)
-1. Manual QC walk of `docs/qc/checklist.md` UI sections on a real binary
-   (download the release artefact from CI; no local builds).
-2. Upload `Cargo.lock` as a CI artefact (or vendor it) so the lockfile is
-   reproducible from clean checkout.
-3. Deferred from review: per-frame recomputation of deck summaries /
+1. Manual QC walk of `docs/qc/checklist.md` UI sections — download the
+   `engram-linux` artefact from the latest CI run (no local builds; the
+   binary is a single file).
+2. Deferred from review: per-frame recomputation of deck summaries /
    filtered ids (fine at current scale; memoise if libraries grow).
 
 ---

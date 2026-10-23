@@ -28,7 +28,9 @@ CI run.
 
 ## Release / packaging
 
-- [ ] Cross-platform build artifacts verified (Linux/Windows/macOS).
+- [ ] Cross-platform build artifacts verified (Linux/Windows/macOS) —
+      every CI run attaches `engram-linux` / `engram-windows` /
+      `engram-macos` plus the `Cargo.lock` used for the build.
 - [ ] App launches on a clean machine; save → reopen → identical state.
 - [ ] Version bumped; CHANGELOG has a release entry.
 - [ ] No secrets/keys committed; no local-only files in the tree.

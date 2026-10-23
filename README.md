@@ -29,8 +29,10 @@ accounts, subscriptions or telemetry.
 
 ## Platforms
 
-Windows, macOS and Linux desktop builds are produced and tested in CI.
-The scheduler, domain and data layers are pure Rust and platform-independent.
+Windows, macOS and Linux desktop builds are produced and tested in CI —
+every CI run attaches ready-to-run binaries as artefacts
+(`engram-linux`, `engram-windows`, `engram-macos`). The scheduler, domain
+and data layers are pure Rust and platform-independent.
 
 ## Build
 

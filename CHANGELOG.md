@@ -47,5 +47,6 @@ All notable changes to Engram are documented here. Format:
 - File management: new/open/save/save-as library, CSV import/export, JSON
   backup export, automatic prompt-free persistence of every mutation.
 - Cross-platform CI (Linux/Windows/macOS): `cargo fmt --check`, clippy
-  `-D warnings`, full test suite, release build.
+  `-D warnings`, full test suite, release build — with the per-OS release
+  binaries and `Cargo.lock` attached as run artefacts.
 - Original procedurally drawn application icon and violet/dark+light theme.
