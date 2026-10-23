@@ -7,7 +7,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use engram::domain::{
     generate_drafts, schedule, Grade, LearnPhase, Library, LibraryError, SchedParams,
-    SchedulingState, Scope, StudySession,
+    SchedulingState, Scope,
 };
 use engram::domain::{CardFilter, CardKind};
 
