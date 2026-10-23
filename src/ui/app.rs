@@ -401,6 +401,8 @@ impl EngramApp {
             let _ = data::save_prefs(&self.prefs);
             self.status = "Checking for updates…".to_string();
         }
+        // Clone the context so the thread owns an 'static handle.
+        let ctx = ctx.clone();
         std::thread::spawn(move || {
             let status = update_check::check_now();
             // The receiver may be gone (app closed) — that is fine.

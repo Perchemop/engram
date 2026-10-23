@@ -64,7 +64,7 @@ pub fn fetch_latest_tag() -> Result<String, String> {
         .timeout_global(Some(Duration::from_secs(10)))
         .build()
         .new_agent();
-    let response = agent
+    let mut response = agent
         .get(RELEASES_API_URL)
         .header("User-Agent", USER_AGENT)
         .header("Accept", "application/vnd.github+json")
