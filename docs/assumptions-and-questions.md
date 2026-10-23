@@ -34,6 +34,19 @@
   generator shipped in V1 (D-009); an optional BYO-API-key generator is a
   candidate for a later slice and was never promised in V1 scope.
 
+## Resolved during the 2026-10-24 guide update
+- **Q4 (suite?)** → Engram is a standalone app; crash-report and
+  update-check ship as in-app modules designed for later extraction
+  (D-015). Revisit if a second app joins a suite.
+- **Q10 (primary local platform)** → Linux aarch64 (the owner's daily
+  machine); CI builds it natively (PR #4).
+- **Q16–Q18 (releases, roadmap, shared crates)** → confirmed: semver GitHub
+  Releases with detailed notes (`release.yml`), public `ROADMAP.md` with
+  evidence-based readiness, crash/update capabilities implemented (D-015).
+- **Q8 (public research sources)** → official docs and public algorithm
+  descriptions only; research notes live in `docs/research/` (created when
+  first needed) with the human gate before dependent implementation.
+
 ## Resolved during discovery
 - Product name → **Engram** (D-001; "SynapseFlow" rejected as too close to
   the inspiration product).

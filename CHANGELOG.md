@@ -4,6 +4,35 @@ All notable changes to Engram are documented here. Format:
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.0] - 2026-10-23
+
+First functional test build. Scope is deliberately limited (see
+`docs/scope.md`); the study core is complete and verified.
+
+### Added
+- Study core: deck tree with colours, tags, Basic + Cloze cards, SM-2
+  scheduling with learning steps and configurable parameters, keyboard-first
+  study sessions (Space reveal, 1–4 grading with interval previews),
+  statistics (activity heatmap, due forecast, retention, streak).
+- Offline card generator from plain notes.
+- Atomic JSON persistence (`.engram.json`), CSV import/export, JSON backups.
+- Crash reporting: panic hook writes a home-path-scrubbed report locally;
+  on next launch the user can review it and submit via a pre-filled GitHub
+  issue (no tokens embedded) or discard it.
+- Update check: GitHub Releases API, at most one automatic check per 24h,
+  fails soft offline; manual check in Help → Check for updates.
+- Platforms: Windows, macOS, Linux x86_64 and Linux aarch64, with release
+  binaries + SHA-256 checksums attached to GitHub Releases.
+
+### Fixed
+- (initial release)
+
+### Known limitations
+- Single cloze face per card (all deletions studied together).
+- CSV tags cannot contain commas; day boundaries are UTC.
+- No sync, accounts, mobile or web target (out of scope for this release).
+- Full list: `docs/known-limitations.md`.
+
 ## [Unreleased]
 
 ### Fixed

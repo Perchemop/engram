@@ -31,8 +31,32 @@ accounts, subscriptions or telemetry.
 
 Windows, macOS and Linux desktop builds are produced and tested in CI —
 every CI run attaches ready-to-run binaries as artefacts
-(`engram-linux`, `engram-windows`, `engram-macos`). The scheduler, domain
-and data layers are pure Rust and platform-independent.
+(`engram-linux`, `engram-linux-arm64`, `engram-windows`, `engram-macos`).
+Tagged releases (`v*.*.*`) additionally publish signed-checksum binaries on
+the [Releases page](https://github.com/Perchemop/engram/releases/latest).
+The scheduler, domain and data layers are pure Rust and platform-independent.
+
+## Privacy
+
+Engram is offline-first and private by design:
+
+- **Your data never leaves your machine.** Cards, decks and review history
+  live in a local file; there is no server, account or telemetry.
+- **Crash reports are created locally and sent only with your explicit
+  click.** The report contains the app version, OS/arch, the panic message
+  and a home-path-scrubbed backtrace. You can review, copy, or discard it;
+  submission opens a pre-filled GitHub issue in your browser (you sign in
+  yourself — the app embeds no tokens).
+- **Update check** queries the public GitHub Releases API
+  (`api.github.com/repos/Perchemop/engram/releases/latest`) at most once
+  per 24 hours (or on demand from Help → Check for updates), sends no data
+  beyond a standard User-Agent, fails silently offline, and links to the
+  release page. It can simply not be used.
+
+## Known limitations
+
+See [`docs/known-limitations.md`](docs/known-limitations.md) for the honest
+list (CSV comma-tags, single cloze face, UTC day boundaries, and more).
 
 ## Build
 

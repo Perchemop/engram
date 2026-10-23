@@ -36,6 +36,21 @@ CI run.
 - [ ] No secrets/keys committed; no local-only files in the tree.
 - [ ] LICENSE present; `ATTRIBUTION.md` complete and accurate.
 
+## Release legal checklist (guide §2.5, run before every public release)
+
+- [ ] No proprietary source, assets, or substantial copied text in tree
+- [ ] No reverse-engineering output used as implementation input
+- [ ] Name/logo original; no vendor marks in UI or installers
+- [ ] UI is original expression (no slavish visual copy)
+- [ ] No known patented techniques implemented where a public alternative exists
+- [ ] Licence clear (MIT OR Apache-2.0); `ATTRIBUTION.md` complete
+- [ ] No secrets in git or release binaries
+- [ ] Crash reports sent only with user consent; privacy documented in README
+- [ ] No embedded privileged tokens (issue submission is a pre-filled URL)
+- [ ] Research notes are original summaries + URLs only
+- [ ] README/ROADMAP make no false affiliation or "drop-in replacement" claims
+- [ ] CONTRIBUTING.md states PR licence terms
+
 ## Originality attestation (every phase)
 
 - [ ] All code, strings, icons, layouts and algorithms are original —
