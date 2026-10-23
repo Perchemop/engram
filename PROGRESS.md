@@ -22,9 +22,17 @@ never rewrite history.
   history + tree came back clean.
 - Platform set now: Linux x86_64, Linux aarch64, Windows, macOS.
 
+### Local install (2026-10-23)
+`engram-linux-arm64` from run `39950660293` installed to
+`~/.local/bin/engram` (on PATH) with a desktop entry
+(`~/.local/share/applications/engram.desktop`, original SVG icon). The app
+is running on the owner's desktop for the manual QC walk. Update path:
+re-download the `engram-linux-arm64` artefact from the latest green CI run
+and repeat the `install -m 755` step.
+
 ### Open items (next session)
-1. Human keyboard/visual QC walk (`docs/qc/checklist.md`) on the
-   `engram-linux-arm64` artefact.
+1. Human keyboard/visual QC walk (`docs/qc/checklist.md`) — the app is
+   installed and running on the owner's desktop for exactly this.
 2. Deferred: per-frame memoisation of deck summaries / filtered ids.
 
 ---
