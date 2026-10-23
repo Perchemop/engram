@@ -28,6 +28,8 @@ gates.
 - Persistence: JSON (serde_json), `.engram.json` extension, human-readable;
   include UUIDs and timestamps; atomic writes (write temp → rename).
 - Git: commit small, focused slices; messages imperative and descriptive.
+  Prefer the PR loop: push a branch, open/update a PR, verify CI, merge
+  (D-013).
 
 ## Testing strategy
 - Unit tests in `src/domain/*` modules and `tests/domain_tests.rs`.
@@ -47,13 +49,28 @@ gates.
 - Study queue: due first, then learning, then new (respecting the daily new
   limit); order is deterministic for tests.
 
-## Subagent pipeline
-Specialised subagents live in `.opencode/agents/` and split the build by
-stage: `domain-dev` (types + unit tests) → `test-writer` (coverage) →
-`ui-dev` (egui slices) → `reviewer` (read-only review) → `docs-writer`
-(process docs) → `fixer` (fmt/clippy/test failures) → `ci-runner` (GitHub
-interaction). All run on free OpenCode models in `subagent` mode;
-conventions: subagents never commit or push (the parent does).
+## CTO.new-style operating model (Chat → Task → PR → merge)
+Every unit of work is a **Task**:
+
+1. **Chat (Orchestrator)** — plan mode: clarify, write the Task brief
+   (requirement IDs, files, acceptance criteria). Never edits code.
+2. **Task (Coder)** — execute exactly one bounded slice: implement, tests,
+   `cargo fmt`, then delegate GitHub interaction to `ci-runner`
+   (commit → push branch → open/update PR).
+3. **GitHub Actions** — the free Task Runner verifies the PR.
+4. **Reviewer** — read-only review of the diff/PR.
+5. **Merge** — with CI green and review done, the orchestrator merges the
+   PR (owner delegated merge authority: DECISIONS.md D-013). `main` is
+   updated; `opencode/ci` is updated in place on the next run.
+6. Update `PROGRESS.md` / `CHANGELOG.md` / `REQUIREMENTS_TRACEABILITY.md`
+   with exact CI results.
+
+Canonical roles (`.opencode/agents/`): `orchestrator` (Chat, plans only),
+`coder` (Task, executes), `explorer` (read-only search), `reviewer`
+(read-only review). Supplementary Task-mode helpers: `domain-dev`,
+`ui-dev`, `test-writer`, `fixer`, `docs-writer`, `ci-runner` (owns every
+GitHub interaction). All run on free OpenCode models in `subagent` mode;
+conventions: subagents never commit or push except `ci-runner`.
 
 ## CI-first (no heavy local runs)
 All CPU/RAM-intensive work runs in **GitHub Actions**, never on the desktop

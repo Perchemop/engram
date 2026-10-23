@@ -81,3 +81,34 @@ CSV (with RFC-4180 quoting, `Deck,Type,Front,Back,Tags`) interchanges with
 spreadsheets and other tools; whole-library JSON backups are exact copies.
 *Rejected:* only-native-format (no interop), Anki's proprietary binary
 `.anki2` (not a public format; clean-room rules forbid reading its internals).
+
+---
+
+## 2026-10-23
+
+### D-013 — CTO.new-style flow adopted; PRs may be self-merged when green
+
+The build guide was updated to the CTO.new operating model: **Chat (plan) →
+Task (execute) → Pull Request (review) → merge**, where GitHub Actions is
+the free "Task Runner" and every Task ends in a PR. The owner additionally
+delegated merge authority: with CI green **and** the reviewer pass done, the
+orchestrator may merge the `opencode/ci` PR itself instead of waiting for a
+human merge. Human review remains possible (PRs stay open for reading), and
+the reviewer subagent runs before every merge.
+
+Agent definitions were aligned to the guide's canonical roles
+(`orchestrator` = Chat planner, `coder` = Task executor, `explorer`,
+`reviewer`), with the existing specialists retained as Task-mode helpers.
+*Rejected:* pushing directly to `main` without a PR (loses the review
+surface the guide now requires).
+
+### D-014 — Daily limits are per-calendar-day, derived from the review log
+
+Review of the V1 diff found that `daily_new_limit` / `daily_reviews_limit`
+were applied per `build_session` call, so a second session the same day got
+a fresh allotment. Fixed: card introductions (a card's first-ever review)
+and non-introduction reviews are counted per calendar day from the review
+log; learning/relearning steps are always served (capping them would strand
+cards mid-step). No schema change was needed — first-review data already
+exists in the log. *Rejected:* adding a `was_new` field (redundant; the log
+already records first reviews; a compat default would add noise).

@@ -6,6 +6,30 @@ All notable changes to Engram are documented here. Format:
 
 ## [Unreleased]
 
+### Fixed
+
+- CSV import/export is now quote-aware across the whole file: multi-line
+  and quoted-comma/quote card content round-trips correctly (previously a
+  multi-line field split into bogus records).
+- JSON backup export is atomic (temp + rename), matching library saves.
+- Deck/path/ancestor walks are cycle-guarded, so a hand-edited or corrupt
+  `.engram.json` can no longer freeze the app; the domain reports sane
+  results instead.
+- Daily new/review limits are now counted per calendar day from the review
+  log (learning steps are always served), instead of per session build.
+- Card/deck/settings dialogs are closed when a library is opened or
+  created, so editors can never commit into a stale deck.
+- A failing auto-save backs off (retry every 5s) instead of hammering the
+  disk every frame; the explicit Save remains immediate.
+- Study page counts are labelled accurately ("new queued (daily cap …)").
+
+### Changed
+
+- Process: adopted the guide's CTO.new-style flow — Chat (plan) → Task
+  (execute) → PR (review) → merge, with agent roles aligned to the guide
+  (`orchestrator`/`coder`/`explorer`/`reviewer`) and specialists retained as
+  Task-mode helpers; PRs are self-merged when CI is green (D-013).
+
 ### Added
 
 - Core domain: card model (Basic + Cloze), deck tree with colours and

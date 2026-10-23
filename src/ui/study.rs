@@ -199,8 +199,12 @@ fn start_screen(ui: &mut Ui, app: &mut EngramApp) {
     let total_in_scope = app.library.cards_in_scope(app.study_scope).len();
     ui.add_space(4.0);
     ui.label(format!(
-        "{} due · {} in learning steps · {} new today · {} card(s) in scope",
-        counts.review, counts.learning, counts.new_cards, total_in_scope
+        "{} due · {} in learning steps · {} new queued (daily cap {}) · {} card(s) in scope",
+        counts.review,
+        counts.learning,
+        counts.new_cards,
+        app.library.settings.daily_new_limit,
+        total_in_scope
     ));
     ui.label(
         RichText::new(format!(

@@ -201,15 +201,23 @@ impl Library {
     }
 
     /// Path segments from the top level down to and including `id`.
+    /// Guarded against corrupted parent cycles: the walk stops after
+    /// at most one step per stored deck.
     ///
     /// # Errors
     /// [`DeckError::NotFound`] when the deck does not exist.
     pub fn deck_path(&self, id: DeckId) -> Result<Vec<String>, DeckError> {
         let mut segments = Vec::new();
         let mut current = Some(id);
+        let mut steps = 0usize;
+        let max_steps = self.decks.len() + 1;
         while let Some(cid) = current {
             let deck = self.deck(cid).ok_or(DeckError::NotFound(cid))?;
             segments.push(deck.name.clone());
+            steps += 1;
+            if steps > max_steps {
+                break; // corrupted parent chain: return the partial path
+            }
             current = deck.parent;
         }
         segments.reverse();
@@ -224,15 +232,18 @@ impl Library {
         Ok(self.deck_path(id)?.join(" › "))
     }
 
-    /// The deck plus every descendant id.
+    /// The deck plus every descendant id. Guarded against corrupted parent
+    /// cycles (e.g. a hand-edited file): every id is pushed at most once.
     #[must_use]
     pub fn descendant_ids(&self, id: DeckId) -> Vec<DeckId> {
         let mut out = vec![id];
+        let mut seen: std::collections::HashSet<DeckId> = std::collections::HashSet::new();
+        seen.insert(id);
         let mut i = 0;
         while i < out.len() {
             let parent = out[i];
             for d in &self.decks {
-                if d.parent == Some(parent) {
+                if d.parent == Some(parent) && seen.insert(d.id) {
                     out.push(d.id);
                 }
             }
@@ -271,13 +282,20 @@ impl Library {
         }
     }
 
-    /// Whether `ancestor` is `id` itself or an ancestor of it.
+    /// Whether `ancestor` is `id` itself or an ancestor of it. Guarded
+    /// against corrupted parent cycles (bounded by the deck count).
     #[must_use]
     pub fn is_ancestor(&self, ancestor: DeckId, id: DeckId) -> bool {
         let mut current = Some(id);
+        let mut steps = 0usize;
+        let max_steps = self.decks.len() + 1;
         while let Some(cid) = current {
             if cid == ancestor {
                 return true;
+            }
+            steps += 1;
+            if steps > max_steps {
+                return false;
             }
             current = self.deck(cid).and_then(|d| d.parent);
         }
@@ -644,8 +662,15 @@ impl Library {
     ///
     /// Ordering (documented, deterministic): due *learning* cards first
     /// (soonest due first), then due *review* cards (soonest due first),
-    /// then up to `settings.daily_new_limit` new cards in creation order.
-    /// The review side is capped by `settings.daily_reviews_limit`.
+    /// then new cards in creation order.
+    ///
+    /// Daily accounting (per calendar day, derived from the review log):
+    /// - Learning/relearning steps are **always served** (they are minutes
+    ///   long; capping them would strand cards mid-step).
+    /// - Due review cards are capped by `daily_reviews_limit` minus the
+    ///   non-introduction reviews already done today.
+    /// - New cards are capped by `daily_new_limit` minus the cards already
+    ///   *introduced* today (a card's first-ever review = its introduction).
     ///
     /// # Errors
     /// [`LibraryError::NothingToStudy`] when the queue is empty.
@@ -655,6 +680,25 @@ impl Library {
         scope: Scope,
         now: DateTime<Utc>,
     ) -> Result<StudySession, LibraryError> {
+        let today = now.date_naive();
+        // First-ever review per card, in log order: cards whose first
+        // review happened today were introduced today.
+        let mut seen_cards: std::collections::HashSet<CardId> = std::collections::HashSet::new();
+        let mut introduced_today: std::collections::HashSet<CardId> =
+            std::collections::HashSet::new();
+        let mut reviews_today = 0usize;
+        for r in &self.reviews {
+            if seen_cards.insert(r.card_id) && r.at.date_naive() == today {
+                introduced_today.insert(r.card_id);
+            }
+            if r.at.date_naive() == today && !introduced_today.contains(&r.card_id) {
+                reviews_today += 1;
+            }
+        }
+        let fresh_budget =
+            usize::from(self.settings.daily_new_limit).saturating_sub(introduced_today.len());
+        let review_budget =
+            usize::from(self.settings.daily_reviews_limit).saturating_sub(reviews_today);
         let mut learning: Vec<(DateTime<Utc>, CardId)> = Vec::new();
         let mut review: Vec<(DateTime<Utc>, CardId)> = Vec::new();
         let mut fresh: Vec<CardId> = Vec::new();
@@ -677,9 +721,8 @@ impl Library {
 
         learning.sort_by_key(|a| a.0);
         review.sort_by_key(|a| a.0);
-        learning.truncate(self.settings.daily_reviews_limit.max(1) as usize);
-        review.truncate(self.settings.daily_reviews_limit as usize);
-        fresh.truncate(self.settings.daily_new_limit as usize);
+        review.truncate(review_budget);
+        fresh.truncate(fresh_budget);
 
         if learning.is_empty() && review.is_empty() && fresh.is_empty() {
             return Err(LibraryError::NothingToStudy);
@@ -858,6 +901,99 @@ mod tests {
         assert_eq!(out.log.interval_before_days, 0.0);
         assert_eq!(l.reviews.len(), 1);
         assert!(l.record_review(Uuid::nil(), Grade::Good, now()).is_err());
+    }
+
+    #[test]
+    fn daily_new_limit_counts_introductions_per_day() {
+        let mut l = lib();
+        l.settings.daily_new_limit = 2;
+        let root = l.decks[0].id;
+        for i in 0..5 {
+            l.add_card(
+                root,
+                CardKind::Basic {
+                    front: format!("n{i}"),
+                    back: "x".into(),
+                },
+                vec![],
+                now(),
+            )
+            .unwrap();
+        }
+
+        // Session 1: exactly two new cards.
+        let s1 = l.build_session(Scope::All, now()).unwrap();
+        assert_eq!(s1.total(), 2);
+        let answer_time = now() + chrono::Duration::minutes(1);
+        for (cid, _) in s1.queue.clone() {
+            l.record_review(cid, Grade::Good, answer_time).unwrap();
+        }
+
+        // Session 2, same day: the two learning steps are always served,
+        // but no further new cards (introductions already used up).
+        // Ten minutes later the learning steps come due: both are served
+        // (steps are never capped), but no further new cards — today's
+        // introductions are used up.
+        let step_due = answer_time + chrono::Duration::minutes(10);
+        let s2 = l.build_session(Scope::All, step_due).unwrap();
+        assert_eq!(s2.total(), 2);
+        assert!(s2.queue.iter().all(|(_, k)| *k == QueueKind::Learning));
+
+        // Graduating both cards (last-step Good) still yields no new cards
+        // today.
+        for (cid, _) in s2.queue.clone() {
+            l.record_review(cid, Grade::Good, step_due).unwrap();
+        }
+        let s3 = l.build_session(Scope::All, step_due).unwrap();
+        assert!(matches!(s3, Err(LibraryError::NothingToStudy)));
+
+        // Tomorrow the budget resets: two more new cards.
+        let tomorrow = now() + chrono::Duration::days(1);
+        let s4 = l.build_session(Scope::All, tomorrow).unwrap();
+        assert_eq!(s4.total(), 2);
+        assert!(s4.queue.iter().all(|(_, k)| *k == QueueKind::New));
+    }
+
+    #[test]
+    fn daily_review_limit_caps_due_reviews_per_day() {
+        let mut l = lib();
+        l.settings.daily_reviews_limit = 1;
+        let root = l.decks[0].id;
+        for i in 0..3 {
+            let c = l
+                .add_card(
+                    root,
+                    CardKind::Basic {
+                        front: format!("r{i}"),
+                        back: "x".into(),
+                    },
+                    vec![],
+                    now(),
+                )
+                .unwrap();
+            let card = l.card_mut(c).unwrap();
+            card.sched.phase = LearnPhase::Review;
+            card.sched.interval_days = 10.0;
+            card.sched.due = now() - chrono::Duration::hours(1);
+        }
+        // Three due review cards, daily cap 1 → one served.
+        let s1 = l.build_session(Scope::All, now()).unwrap();
+        assert_eq!(s1.total(), 1);
+        let (cid, _) = s1.current().unwrap();
+        // Answer Again: the card lapses into relearning, and today's review
+        // budget is spent.
+        l.record_review(cid, Grade::Again, now()).unwrap();
+        // Ten minutes later (step due): the relearning step is always served,
+        // but no further review cards fit today's budget.
+        let lapse_time = now() + chrono::Duration::minutes(10);
+        let s2 = l.build_session(Scope::All, lapse_time).unwrap();
+        assert_eq!(s2.total(), 1);
+        assert_eq!(s2.queue[0].1, QueueKind::Learning);
+        // Tomorrow: budget resets — relearning step + one review (cap 1).
+        let s3 = l
+            .build_session(Scope::All, now() + chrono::Duration::days(1))
+            .unwrap();
+        assert_eq!(s3.total(), 2);
     }
 
     #[test]
@@ -1047,6 +1183,22 @@ mod tests {
         assert_eq!(root_summary.due_count, 0);
         let sub_summary = summaries.iter().find(|s| s.id == sub).unwrap();
         assert_eq!(sub_summary.card_count, 1);
+    }
+
+    #[test]
+    fn corrupted_parent_cycles_terminate() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let a = l.new_deck(Some(root), "A", None, now()).unwrap();
+        // Forge a self-parent cycle, as a hand-edited file could.
+        l.decks.iter_mut().find(|d| d.id == a).unwrap().parent = Some(a);
+        // All walks must terminate and stay sane.
+        assert_eq!(l.descendant_ids(a), vec![a]);
+        assert!(l.deck_path(a).is_ok());
+        assert!(!l.is_ancestor(a, root));
+        // The library is still repairable: re-parent the cycle away.
+        assert!(l.move_deck(a, Some(root)).is_ok());
+        assert_eq!(l.deck(a).unwrap().parent, Some(root));
     }
 
     #[test]

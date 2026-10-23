@@ -55,7 +55,7 @@ fn prefs_path() -> Option<PathBuf> {
 /// Atomically write text to `path`: write to a sibling temp file, then
 /// rename over the target. A crash mid-write can never truncate existing
 /// data.
-fn atomic_write(path: &std::path::Path, contents: &str) -> Result<(), DataError> {
+pub(crate) fn atomic_write(path: &std::path::Path, contents: &str) -> Result<(), DataError> {
     let parent = path
         .parent()
         .ok_or_else(|| DataError::Path(format!("no parent directory for {}", path.display())))?;
