@@ -912,7 +912,7 @@ impl Library {
         }
 
         learning.sort_by_key(|a| a.0);
-        review.sort_by(|a, b| b.0.cmp(&a.0));
+        review.sort_by_key(|a| std::cmp::Reverse(a.0));
         review.truncate(review_budget);
         fresh.truncate(fresh_budget);
 
