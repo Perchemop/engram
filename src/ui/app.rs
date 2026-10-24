@@ -13,7 +13,7 @@ use crate::domain::{
     format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, Scope,
     StudySession, Theme,
 };
-use crate::ui::{decks, editor, generate, stats, study, theme};
+use crate::ui::{decks, editor, generate, import, stats, study, theme};
 use crate::update_check;
 
 /// Top-level pages.
@@ -61,6 +61,7 @@ pub struct EngramApp {
     pub(crate) card_editor: Option<editor::CardEditor>,
     pub(crate) deck_dialog: Option<editor::DeckDialog>,
     pub(crate) settings_dialog: Option<editor::SettingsDialog>,
+    pub(crate) import_dialog: Option<import::ImportDialog>,
 
     // Study state.
     pub(crate) session: Option<StudySession>,
@@ -148,6 +149,7 @@ impl EngramApp {
             card_editor: None,
             deck_dialog: None,
             settings_dialog: None,
+            import_dialog: None,
             session: None,
             revealed: false,
             study_scope: Scope::All,
@@ -409,6 +411,7 @@ impl EngramApp {
         self.card_editor = None;
         self.deck_dialog = None;
         self.settings_dialog = None;
+        self.import_dialog = None;
         self.confirm_delete_deck = None;
         self.history_card = None;
     }
@@ -616,6 +619,17 @@ impl EngramApp {
                     self.import_csv_action();
                     ui.close();
                 }
+                if ui.button("Import text…").clicked() {
+                    let deck = self
+                        .selected_deck
+                        .or_else(|| self.library.decks.first().map(|d| d.id));
+                    if let Some(deck) = deck {
+                        self.import_dialog = Some(import::ImportDialog::new(deck));
+                    } else {
+                        self.status = "Create a deck before importing".to_string();
+                    }
+                    ui.close();
+                }
                 if ui.button("Export CSV…").clicked() {
                     self.export_csv_action();
                     ui.close();
@@ -797,6 +811,22 @@ impl EngramApp {
             }
         }
 
+<<<<<<< HEAD
+=======
+        // Import text dialog.
+        if self.import_dialog.is_some() {
+            let mut open = true;
+            egui::Window::new("Import text")
+                .open(&mut open)
+                .resizable(true)
+                .default_width(760.0)
+                .show(ui.ctx(), |ui| self.import_dialog_window(ui));
+            if !open {
+                self.import_dialog = None;
+            }
+        }
+
+>>>>>>> opencode/ci
         // Settings dialog.
         if self.settings_dialog.is_some() {
             let mut open = true;
@@ -1128,6 +1158,182 @@ impl EngramApp {
         });
     }
 
+    fn import_dialog_window(&mut self, ui: &mut Ui) {
+        let mut do_import = false;
+        let mut close = false;
+        {
+            let Some(dialog) = self.import_dialog.as_mut() else {
+                return;
+            };
+            let t = self.prefs.theme;
+            ui.horizontal(|ui| {
+                if ui.button("Choose file…").clicked() {
+                    dialog.pick_file();
+                }
+                if let Some(path) = &dialog.path {
+                    ui.label(path.display().to_string());
+                } else {
+                    ui.label(RichText::new("No file selected").weak());
+                }
+            });
+            if let Some(err) = &dialog.error {
+                ui.label(RichText::new(err).color(theme::danger(t)));
+            }
+            let cols = dialog.column_count();
+            if cols > 0 {
+                ui.add_space(4.0);
+                egui::Grid::new("import_mapping")
+                    .num_columns(2)
+                    .spacing([10.0, 6.0])
+                    .show(ui, |ui| {
+                        ui.label("Separator");
+                        ui.label(if dialog.separator == '\t' { "TAB" } else { "comma" });
+                        ui.end_row();
+
+                        ui.label("Front column");
+                        egui::ComboBox::from_id_salt("import_front")
+                            .selected_text(format!("Column {}", dialog.front + 1))
+                            .show_ui(ui, |ui| {
+                                for i in 0..cols {
+                                    ui.selectable_value(&mut dialog.front, i, format!("Column {}", i + 1));
+                                }
+                            });
+                        ui.end_row();
+
+                        ui.label("Back column");
+                        egui::ComboBox::from_id_salt("import_back")
+                            .selected_text(format!("Column {}", dialog.back + 1))
+                            .show_ui(ui, |ui| {
+                                for i in 0..cols {
+                                    ui.selectable_value(&mut dialog.back, i, format!("Column {}", i + 1));
+                                }
+                            });
+                        ui.end_row();
+
+                        ui.label("Tags column");
+                        let tags_text = match dialog.tags {
+                            Some(i) => format!("Column {}", i + 1),
+                            None => "None".to_string(),
+                        };
+                        egui::ComboBox::from_id_salt("import_tags")
+                            .selected_text(tags_text)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut dialog.tags, None, "None");
+                                for i in 0..cols {
+                                    ui.selectable_value(&mut dialog.tags, Some(i), format!("Column {}", i + 1));
+                                }
+                            });
+                        ui.end_row();
+
+                        ui.label("Deck column");
+                        let deck_text = match dialog.deck {
+                            Some(i) => format!("Column {}", i + 1),
+                            None => "None".to_string(),
+                        };
+                        egui::ComboBox::from_id_salt("import_deck")
+                            .selected_text(deck_text)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut dialog.deck, None, "None");
+                                for i in 0..cols {
+                                    ui.selectable_value(&mut dialog.deck, Some(i), format!("Column {}", i + 1));
+                                }
+                            });
+                        ui.end_row();
+                    });
+            }
+
+            if dialog.header_detected() {
+                ui.label(RichText::new("Header row detected — it will be skipped.").color(theme::muted(t)));
+            }
+            if dialog.cloze_hint() {
+                ui.label(RichText::new("Cloze markup ({{cN::…}}) detected in front column.").color(theme::ACCENT));
+            }
+
+            ui.add_space(4.0);
+            ui.label(RichText::new("Preview (first 10 rows):").strong());
+            egui::ScrollArea::both()
+                .max_height(180.0)
+                .show(ui, |ui| {
+                    egui::Grid::new("import_preview")
+                        .spacing([8.0, 2.0])
+                        .show(ui, |ui| {
+                            for row in dialog.preview_rows() {
+                                for cell in row {
+                                    ui.label(crate::ui::decks::truncate(cell, 40));
+                                }
+                                ui.end_row();
+                            }
+                        });
+                });
+
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.label("Target deck");
+                let options: Vec<(String, Uuid)> = self
+                    .library
+                    .decks
+                    .iter()
+                    .map(|d| (d.name.clone(), d.id))
+                    .collect();
+                egui::ComboBox::from_id_salt("import_target_deck")
+                    .selected_text(
+                        options
+                            .iter()
+                            .find(|(_, id)| *id == dialog.deck_id)
+                            .map(|(n, _)| n.clone())
+                            .unwrap_or_else(|| "—".to_string()),
+                    )
+                    .show_ui(ui, |ui| {
+                        for (name, id) in &options {
+                            ui.selectable_value(&mut dialog.deck_id, *id, name.clone());
+                        }
+                    });
+            });
+
+            if let Some(report) = &dialog.report {
+                ui.add_space(4.0);
+                ui.label(RichText::new(report.summary()).strong());
+                ui.label(format!(
+                    "imported {} · duplicates {} · invalid {}",
+                    report.imported, report.skipped_duplicates, report.skipped_invalid
+                ));
+            }
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(!dialog.text.is_empty(), egui::Button::new("Import"))
+                    .clicked()
+                {
+                    do_import = true;
+                }
+                if ui.button("Close").clicked() {
+                    close = true;
+                }
+            });
+        }
+        if close {
+            self.import_dialog = None;
+            return;
+        }
+        if do_import {
+            let now = chrono::Utc::now();
+            if let Some(dialog) = self.import_dialog.as_mut() {
+                match dialog.run_import(&mut self.library, now) {
+                    Ok(report) => {
+                        dialog.report = Some(report);
+                        dialog.result = Some(report.summary());
+                        self.status = report.summary();
+                        self.dirty = true;
+                    }
+                    Err(e) => {
+                        dialog.error = Some(e.to_string());
+                    }
+                }
+            }
+        }
+    }
+
     fn settings_dialog_window(&mut self, ui: &mut Ui) {
         let mut apply = false;
         let mut cancel = false;
@@ -1292,7 +1498,8 @@ impl App for EngramApp {
             }
             let dialog_open = self.card_editor.is_some()
                 || self.deck_dialog.is_some()
-                || self.settings_dialog.is_some();
+                || self.settings_dialog.is_some()
+                || self.import_dialog.is_some();
             if i.key_pressed(egui::Key::Escape) {
                 if dialog_open {
                     self.close_all_dialogs();

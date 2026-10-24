@@ -4,6 +4,7 @@ pub mod app;
 pub mod decks;
 pub mod editor;
 pub mod generate;
+pub mod import;
 pub mod icon;
 pub mod stats;
 pub mod study;

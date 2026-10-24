@@ -29,9 +29,11 @@ fn csv_field(s: &str) -> String {
     }
 }
 
-/// Parse RFC-4180 records: quote-aware, so commas and newlines inside
-/// quoted fields stay part of the field and `""` unescapes to `"`.
-fn csv_records(text: &str) -> Vec<Vec<String>> {
+/// Parse delimited RFC-4180 records: quote-aware, so the separator and
+/// newlines inside quoted fields stay part of the field and `""`
+/// unescapes to `"`. Shared by the comma CSV exchange and the TAB/CSV
+/// text importer (`data::import`).
+pub(crate) fn delimited_records(text: &str, separator: char) -> Vec<Vec<String>> {
     let mut records: Vec<Vec<String>> = Vec::new();
     let mut fields: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -52,7 +54,7 @@ fn csv_records(text: &str) -> Vec<Vec<String>> {
         } else {
             match c {
                 '"' => in_quotes = true,
-                ',' => fields.push(std::mem::take(&mut current)),
+                _ if c == separator => fields.push(std::mem::take(&mut current)),
                 '\r' => {}
                 '\n' => {
                     fields.push(std::mem::take(&mut current));
@@ -67,6 +69,11 @@ fn csv_records(text: &str) -> Vec<Vec<String>> {
         records.push(fields);
     }
     records
+}
+
+/// Parse comma-separated RFC-4180 records (Engram's own CSV exchange).
+fn csv_records(text: &str) -> Vec<Vec<String>> {
+    delimited_records(text, ',')
 }
 
 /// Export the cards of `scope` as CSV. Returns the number of card rows.
