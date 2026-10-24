@@ -3,3 +3,4 @@
 check (ubuntu-latest)
 build (windows-latest)
 build (macos-latest)
+supply-chain
