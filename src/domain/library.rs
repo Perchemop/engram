@@ -42,6 +42,12 @@ pub struct LibrarySettings {
     pub sched: SchedParams,
     pub daily_new_limit: u32,
     pub daily_reviews_limit: u32,
+    /// Queue arrangement mode (`docs/research/queue-ordering.md`).
+    #[serde(default)]
+    pub queue_order: QueueOrder,
+    /// Seed for the seeded-shuffle mode (deterministic per day).
+    #[serde(default)]
+    pub queue_seed: u64,
 }
 
 impl Default for LibrarySettings {
@@ -50,6 +56,36 @@ impl Default for LibrarySettings {
             sched: SchedParams::default(),
             daily_new_limit: DEFAULT_DAILY_NEW_LIMIT,
             daily_reviews_limit: DEFAULT_DAILY_REVIEWS_LIMIT,
+            queue_order: QueueOrder::DueFirst,
+            queue_seed: 0,
+        }
+    }
+}
+
+/// How the study queue is arranged (`docs/research/queue-ordering.md`).
+/// Learning steps always keep their own due order in every mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum QueueOrder {
+    /// Learning → review (soonest due) → new (creation order). Default;
+    /// identical to Engram 0.1.0.
+    #[default]
+    DueFirst,
+    /// Learning first, then new cards spread evenly through the due
+    /// review cards (documented formula).
+    Interleaved,
+    /// Learning first, then review + new cards in a seeded shuffle that
+    /// is stable within a day.
+    Random,
+}
+
+impl QueueOrder {
+    /// Human-readable label.
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::DueFirst => "Due first",
+            Self::Interleaved => "Interleaved",
+            Self::Random => "Shuffled (daily seed)",
         }
     }
 }
@@ -108,6 +144,9 @@ pub enum QueueKind {
     Learning,
     /// Brand-new card being introduced.
     New,
+    /// Cram session: recorded for statistics, never mutates the
+    /// schedule (`docs/research/cram-sessions.md`).
+    Cram,
 }
 
 impl QueueKind {
@@ -118,6 +157,7 @@ impl QueueKind {
             Self::Review => "Review",
             Self::Learning => "Learning",
             Self::New => "New",
+            Self::Cram => "Cram",
         }
     }
 }
@@ -525,6 +565,71 @@ impl Library {
         Ok(())
     }
 
+    /// Suspend or resume a card. Suspended cards never enter queues.
+    ///
+    /// # Errors
+    /// [`LibraryError::CardNotFound`].
+    pub fn set_card_suspended(
+        &mut self,
+        id: CardId,
+        suspended: bool,
+        now: DateTime<Utc>,
+    ) -> Result<(), LibraryError> {
+        let card = self.card_mut(id).ok_or(LibraryError::CardNotFound(id))?;
+        card.suspended = suspended;
+        card.modified = now;
+        Ok(())
+    }
+
+    /// Bury a card until the given instant (resume is automatic).
+    ///
+    /// # Errors
+    /// [`LibraryError::CardNotFound`].
+    pub fn bury_card_until(
+        &mut self,
+        id: CardId,
+        until: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Result<(), LibraryError> {
+        let card = self.card_mut(id).ok_or(LibraryError::CardNotFound(id))?;
+        card.buried_until = Some(until);
+        card.modified = now;
+        Ok(())
+    }
+
+    /// Set per-deck daily-limit overrides (`None` inherits from the
+    /// parent; `docs/research/deck-local-limits.md`).
+    ///
+    /// # Errors
+    /// [`LibraryError::Deck`] when the deck does not exist.
+    pub fn set_deck_limits(
+        &mut self,
+        id: DeckId,
+        new_limit_override: Option<u32>,
+        review_limit_override: Option<u32>,
+    ) -> Result<(), LibraryError> {
+        let deck = self
+            .decks
+            .iter_mut()
+            .find(|d| d.id == id)
+            .ok_or(DeckError::NotFound(id))?;
+        deck.new_limit_override = new_limit_override;
+        deck.review_limit_override = review_limit_override;
+        Ok(())
+    }
+
+    /// Review history for one card, newest first.
+    #[must_use]
+    pub fn reviews_for(&self, card_id: CardId) -> Vec<&ReviewLog> {
+        let mut out: Vec<&ReviewLog> = self
+            .reviews
+            .iter()
+            .filter(|r| r.card_id == card_id)
+            .collect();
+        out.reverse();
+        out
+    }
+
     /// Delete a card and its review history.
     ///
     /// # Errors
@@ -559,9 +664,16 @@ impl Library {
             .card_mut(card_id)
             .ok_or(LibraryError::CardNotFound(card_id))?;
         let interval_before = card.sched.interval_days;
-        let after = schedule(now, &params, &card.sched, grade);
-        card.sched = after.clone();
-        card.modified = now;
+        // Cram answers are recorded but never mutate the schedule
+        // (`docs/research/cram-sessions.md`).
+        let after = if queue_kind == QueueKind::Cram {
+            card.sched.clone()
+        } else {
+            let after = schedule(now, &params, &card.sched, grade);
+            card.sched = after.clone();
+            card.modified = now;
+            after
+        };
         let log = ReviewLog {
             id: Uuid::new_v4(),
             card_id,
@@ -585,6 +697,9 @@ impl Library {
     pub fn due_counts(&self, scope: Scope, now: DateTime<Utc>) -> DueCounts {
         let mut counts = DueCounts::default();
         for c in self.cards_in_scope(scope) {
+            if c.is_blocked(now) {
+                continue; // suspended / buried cards are not due work
+            }
             match c.sched.phase {
                 LearnPhase::New => counts.new_cards += 1,
                 LearnPhase::Learning | LearnPhase::Relearning => {
@@ -661,6 +776,87 @@ impl Library {
             .collect()
     }
 
+    /// Resolve the effective daily limits for a scope: the most specific
+    /// deck override walking up the tree, else the library defaults.
+    /// Returns the limits and the deck (if any) whose override applied.
+    #[must_use]
+    pub fn effective_limits(&self, scope: Scope) -> ((u32, u32), Option<DeckId>) {
+        let defaults = (
+            self.settings.daily_new_limit,
+            self.settings.daily_reviews_limit,
+        );
+        let root = match scope {
+            Scope::All => return (defaults, None),
+            Scope::Deck(id) => id,
+        };
+        let mut new_l = self.settings.daily_new_limit;
+        let mut rev_l = self.settings.daily_reviews_limit;
+        let (mut new_found, mut rev_found) = (false, false);
+        let mut source: Option<DeckId> = None;
+        let mut current = Some(root);
+        let mut steps = 0usize;
+        let max_steps = self.decks.len() + 1;
+        while let Some(id) = current {
+            steps += 1;
+            if steps > max_steps {
+                break; // corrupted ancestry guard
+            }
+            if let Some(d) = self.deck(id) {
+                if !new_found {
+                    if let Some(v) = d.new_limit_override {
+                        new_l = v;
+                        new_found = true;
+                        source = Some(id);
+                    }
+                }
+                if !rev_found {
+                    if let Some(v) = d.review_limit_override {
+                        rev_l = v;
+                        rev_found = true;
+                        if source.is_none() {
+                            source = Some(id);
+                        }
+                    }
+                }
+                if new_found && rev_found {
+                    break;
+                }
+                current = d.parent;
+            } else {
+                break;
+            }
+        }
+        ((new_l, rev_l), source)
+    }
+
+    /// Introductions and non-introduction reviews recorded today, counted
+    /// within `scope` only (per-subtree accounting, D-014 refined).
+    #[must_use]
+    fn todays_accounting(&self, scope: Scope, today: chrono::NaiveDate) -> (usize, usize) {
+        let scope_ids = match scope {
+            Scope::All => None,
+            Scope::Deck(id) => Some(self.descendant_ids(id)),
+        };
+        let mut introduced = std::collections::HashSet::<CardId>::new();
+        let mut reviews = 0usize;
+        for r in &self.reviews {
+            if r.at.date_naive() != today {
+                continue;
+            }
+            if let Some(ids) = &scope_ids {
+                if !ids.contains(&r.deck_id) {
+                    continue;
+                }
+            }
+            if r.queue_kind == QueueKind::New {
+                introduced.insert(r.card_id);
+            } else if r.queue_kind != QueueKind::Cram {
+                reviews += 1;
+            }
+        }
+        (introduced.len(), reviews)
+    }
+
     // ------------------------------------------------------------------
     // Sessions
     // ------------------------------------------------------------------
@@ -687,31 +883,20 @@ impl Library {
         scope: Scope,
         now: DateTime<Utc>,
     ) -> Result<StudySession, LibraryError> {
-        let today = now.date_naive();
-        // Cards introduced today (served from the New bucket) and
-        // non-introduction reviews done today.
-        let mut introduced_today: std::collections::HashSet<CardId> =
-            std::collections::HashSet::new();
-        let mut reviews_today = 0usize;
-        for r in &self.reviews {
-            if r.at.date_naive() != today {
-                continue;
-            }
-            if r.queue_kind == QueueKind::New {
-                introduced_today.insert(r.card_id);
-            } else {
-                reviews_today += 1;
-            }
-        }
-        let fresh_budget =
-            (self.settings.daily_new_limit as usize).saturating_sub(introduced_today.len());
-        let review_budget =
-            (self.settings.daily_reviews_limit as usize).saturating_sub(reviews_today);
+        let ((new_limit, review_limit), _) = self.effective_limits(scope);
+        let (introduced_today, reviews_today) =
+            self.todays_accounting(scope, now.date_naive());
+        let fresh_budget = (new_limit as usize).saturating_sub(introduced_today);
+        let review_budget = (review_limit as usize).saturating_sub(reviews_today);
+
         let mut learning: Vec<(DateTime<Utc>, CardId)> = Vec::new();
         let mut review: Vec<(DateTime<Utc>, CardId)> = Vec::new();
         let mut fresh: Vec<CardId> = Vec::new();
 
         for c in self.cards_in_scope(scope) {
+            if c.is_blocked(now) {
+                continue; // suspended / buried: never queued
+            }
             match c.sched.phase {
                 LearnPhase::New => fresh.push(c.id),
                 LearnPhase::Learning | LearnPhase::Relearning => {
@@ -736,18 +921,143 @@ impl Library {
             return Err(LibraryError::NothingToStudy);
         }
 
-        let mut queue = Vec::with_capacity(learning.len() + review.len() + fresh.len());
-        for (_, id) in learning {
-            queue.push((id, QueueKind::Learning));
-        }
-        for (_, id) in review {
-            queue.push((id, QueueKind::Review));
-        }
-        for id in fresh {
-            queue.push((id, QueueKind::New));
-        }
-
+        let queue = arrange_queue(
+            self.settings.queue_order,
+            self.settings.queue_seed,
+            now,
+            learning,
+            review,
+            fresh,
+        );
         Ok(StudySession::new(queue, now))
+    }
+
+    /// Build a cram session: every card in scope regardless of phase or
+    /// due date (blocked cards excluded), ignoring daily limits.
+    /// Answers are logged with `QueueKind::Cram` and never mutate the
+    /// schedule (`docs/research/cram-sessions.md`).
+    ///
+    /// # Errors
+    /// [`LibraryError::NothingToStudy`] when the scope has no studyable
+    /// cards.
+    pub fn build_cram_session(
+        &self,
+        scope: Scope,
+        limit: usize,
+        now: DateTime<Utc>,
+    ) -> Result<StudySession, LibraryError> {
+        let mut queue: Vec<(CardId, QueueKind)> = Vec::new();
+        for c in self.cards_in_scope(scope) {
+            if c.is_blocked(now) {
+                continue;
+            }
+            queue.push((c.id, QueueKind::Cram));
+        }
+        queue.truncate(limit);
+        if queue.is_empty() {
+            return Err(LibraryError::NothingToStudy);
+        }
+        Ok(StudySession::new(queue, now))
+    }
+}
+
+/// Arrange the collected buckets into a study queue per the configured
+/// order. Learning steps always keep due order first in every mode.
+#[must_use]
+pub fn arrange_queue(
+    order: QueueOrder,
+    seed: u64,
+    now: DateTime<Utc>,
+    learning: Vec<(DateTime<Utc>, CardId)>,
+    review: Vec<(DateTime<Utc>, CardId)>,
+    fresh: Vec<CardId>,
+) -> Vec<(CardId, QueueKind)> {
+    let mut queue: Vec<(CardId, QueueKind)> = Vec::with_capacity(
+        learning.len() + review.len() + fresh.len(),
+    );
+    for (_, id) in learning {
+        queue.push((id, QueueKind::Learning));
+    }
+
+    let review_ids: Vec<CardId> = review.into_iter().map(|(_, id)| id).collect();
+    match order {
+        QueueOrder::DueFirst => {
+            queue.extend(review_ids.into_iter().map(|id| (id, QueueKind::Review)));
+            queue.extend(fresh.into_iter().map(|id| (id, QueueKind::New)));
+        }
+        QueueOrder::Interleaved => {
+            for id in interleave(&review_ids, &fresh) {
+                let kind = if review_ids.contains(&id) {
+                    QueueKind::Review
+                } else {
+                    QueueKind::New
+                };
+                queue.push((id, kind));
+            }
+        }
+        QueueOrder::Random => {
+            let mut mixed: Vec<(CardId, QueueKind)> = review_ids
+                .into_iter()
+                .map(|id| (id, QueueKind::Review))
+                .chain(fresh.into_iter().map(|id| (id, QueueKind::New)))
+                .collect();
+            let day_stamp = now
+                .date_naive()
+                .and_hms_opt(0, 0, 0)
+                .map(|t| t.and_utc().timestamp() as u64)
+                .unwrap_or(0);
+            shuffle_seeded(&mut mixed, seed ^ day_stamp);
+            queue.extend(mixed);
+        }
+    }
+    queue
+}
+
+/// Interleave new cards through review cards: the i-th new card lands at
+/// position `floor(i * (R+N)/N)` (`docs/research/queue-ordering.md`).
+#[must_use]
+pub fn interleave(review: &[CardId], fresh: &[CardId]) -> Vec<CardId> {
+    let (r, n) = (review.len(), fresh.len());
+    if n == 0 {
+        return review.to_vec();
+    }
+    if r == 0 {
+        return fresh.to_vec();
+    }
+    let total = r + n;
+    let mut is_new = vec![false; total];
+    for pos in (0..n).map(|i| (i * total / n).min(total - 1)) {
+        is_new[pos] = true;
+    }
+    let mut out = Vec::with_capacity(total);
+    let mut ri = 0usize;
+    let mut fi = 0usize;
+    for slot in is_new {
+        if slot {
+            out.push(fresh[fi]);
+            fi += 1;
+        } else {
+            out.push(review[ri]);
+            ri += 1;
+        }
+    }
+    out
+}
+
+/// Deterministic seeded Fisher-Yates using a splitmix64 stream — no
+/// external RNG dependency, reproducible for the same seed.
+fn shuffle_seeded<T>(items: &mut [T], seed: u64) {
+    let mut state = seed;
+    let mut next = move || {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+    for i in (1..items.len()).rev() {
+        let j = (next() % (i as u64 + 1)) as usize;
+        items.swap(i, j);
     }
 }
 
@@ -1215,6 +1525,290 @@ mod tests {
         // The library is still repairable: re-parent the cycle away.
         assert!(l.move_deck(a, Some(root)).is_ok());
         assert_eq!(l.deck(a).unwrap().parent, Some(root));
+    }
+
+    /// Add a basic card with a one-word back to `deck`; keeps test setup
+    /// terse and the formatting stable.
+    fn basic(l: &mut Library, deck: DeckId, front: &str, at: DateTime<Utc>) -> CardId {
+        l.add_card(
+            deck,
+            CardKind::Basic {
+                front: front.to_string(),
+                back: "x".to_string(),
+            },
+            Vec::new(),
+            at,
+        )
+        .unwrap()
+    }
+
+    /// Make a card a graduated review card due `hours_overdue` before `at`.
+    fn make_review(l: &mut Library, id: CardId, hours_overdue: i32, at: DateTime<Utc>) {
+        let card = l.card_mut(id).unwrap();
+        card.sched.phase = LearnPhase::Review;
+        card.sched.interval_days = 5.0;
+        card.sched.due = at - chrono::Duration::hours(i64::from(hours_overdue));
+    }
+
+    #[test]
+    fn queue_order_due_first_matches_v010() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        l.settings.daily_new_limit = 20;
+        let r1 = basic(&mut l, root, "r1", now());
+        let r2 = basic(&mut l, root, "r2", now());
+        make_review(&mut l, r1, 3, now());
+        make_review(&mut l, r2, 1, now());
+        let n1 = basic(&mut l, root, "n1", now());
+        let n2 = basic(&mut l, root, "n2", now());
+
+        let session = l.build_session(Scope::All, now()).unwrap();
+        let ids: Vec<CardId> = session.queue.iter().map(|(id, _)| *id).collect();
+        assert_eq!(
+            ids,
+            vec![r2, r1, n1, n2],
+            "soonest due first, then new cards in creation order"
+        );
+    }
+
+    #[test]
+    fn queue_order_interleaved_spreads_new_cards() {
+        let mut l = lib();
+        l.settings.queue_order = QueueOrder::Interleaved;
+        let root = l.decks[0].id;
+        let mut reviews = Vec::new();
+        for i in 0..4 {
+            let id = basic(&mut l, root, &format!("r{i}"), now());
+            make_review(&mut l, id, 1 + i, now());
+            reviews.push(id);
+        }
+        let mut fresh = Vec::new();
+        for i in 0..2 {
+            fresh.push(basic(&mut l, root, &format!("n{i}"), now()));
+        }
+        let session = l.build_session(Scope::All, now()).unwrap();
+        let ids: Vec<CardId> = session.queue.iter().map(|(id, _)| *id).collect();
+        // Documented formula: new card i sits at floor(i * 6 / 2) = 0 and 3.
+        assert_eq!(ids[0], fresh[0]);
+        assert_eq!(ids[3], fresh[1]);
+        for slot in [1, 2, 4, 5] {
+            assert!(reviews.contains(&ids[slot]));
+        }
+    }
+
+    #[test]
+    fn queue_order_random_is_seeded_and_daily_stable() {
+        let mut l = lib();
+        l.settings.queue_order = QueueOrder::Random;
+        l.settings.queue_seed = 42;
+        let root = l.decks[0].id;
+        for i in 0..8 {
+            basic(&mut l, root, &format!("c{i}"), now());
+        }
+        let order = |lib: &Library, at: DateTime<Utc>| -> Vec<CardId> {
+            lib.build_session(Scope::All, at)
+                .unwrap()
+                .queue
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        let a = order(&l, now());
+        let b = order(&l, now());
+        assert_eq!(a, b, "same day + seed + state => same queue");
+        let later = now() + chrono::Duration::days(1);
+        let c = order(&l, later);
+        assert_ne!(a, c, "a different day changes the shuffle");
+        assert_eq!(a.len(), 8);
+    }
+
+    #[test]
+    fn interleave_handles_empty_sides() {
+        let (a, b, c) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        assert_eq!(interleave(&[a], &[]), vec![a]);
+        assert_eq!(interleave(&[], &[c]), vec![c]);
+        assert_eq!(interleave(&[a, b], &[c]), vec![c, a, b]);
+    }
+
+    #[test]
+    fn deck_local_limits_resolve_most_specific_override() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let child = l.new_deck(Some(root), "Child", None, now()).unwrap();
+        let grand = l.new_deck(Some(child), "Grand", None, now()).unwrap();
+
+        let ((n, r), source) = l.effective_limits(Scope::Deck(grand));
+        assert_eq!(n, l.settings.daily_new_limit);
+        assert_eq!(r, l.settings.daily_reviews_limit);
+        assert_eq!(source, None);
+
+        l.set_deck_limits(child, Some(5), None).unwrap();
+        let ((n, _), source) = l.effective_limits(Scope::Deck(grand));
+        assert_eq!(n, 5, "a parent override reaches the subtree");
+        assert_eq!(source, Some(child));
+        let ((root_n, _), _) = l.effective_limits(Scope::Deck(root));
+        assert_eq!(root_n, l.settings.daily_new_limit);
+
+        l.set_deck_limits(grand, Some(2), Some(9)).unwrap();
+        let ((n, r), source) = l.effective_limits(Scope::Deck(grand));
+        assert_eq!((n, r), (2, 9), "the most specific override wins");
+        assert_eq!(source, Some(grand));
+    }
+
+    #[test]
+    fn deck_local_limits_are_enforced_per_subtree() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let a = l.new_deck(Some(root), "A", None, now()).unwrap();
+        let b = l.new_deck(Some(root), "B", None, now()).unwrap();
+        l.set_deck_limits(a, Some(1), None).unwrap();
+        for deck in [a, b] {
+            for i in 0..2 {
+                basic(&mut l, deck, &format!("d{i}"), now());
+            }
+        }
+        let sa = l.build_session(Scope::Deck(a), now()).unwrap();
+        assert_eq!(sa.total(), 1);
+        let sb = l.build_session(Scope::Deck(b), now()).unwrap();
+        assert_eq!(sb.total(), 2);
+        let sall = l.build_session(Scope::All, now()).unwrap();
+        assert_eq!(sall.total(), 4, "root has no override => library defaults");
+    }
+
+    #[test]
+    fn suspended_and_buried_cards_never_queue() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let c1 = basic(&mut l, root, "s", now());
+        let c2 = basic(&mut l, root, "b", now());
+        let c3 = basic(&mut l, root, "ok", now());
+
+        l.set_card_suspended(c1, true, now()).unwrap();
+        let tomorrow = now() + chrono::Duration::days(1);
+        l.bury_card_until(c2, tomorrow, now()).unwrap();
+
+        let ids: Vec<CardId> = l
+            .build_session(Scope::All, now())
+            .unwrap()
+            .queue
+            .iter()
+            .map(|(id, _)| *id)
+            .collect();
+        assert_eq!(ids, vec![c3]);
+        assert_eq!(l.due_counts(Scope::All, now()).new_cards, 1);
+
+        // A past bury time unblocks without mutation.
+        let past = now() - chrono::Duration::hours(1);
+        l.bury_card_until(c2, past, now()).unwrap();
+        assert_eq!(l.build_session(Scope::All, now()).unwrap().total(), 2);
+
+        // Resume keeps the old due state exactly.
+        l.set_card_suspended(c1, false, now()).unwrap();
+        let card = l.card(c1).unwrap();
+        assert!(!card.suspended);
+        assert_eq!(card.sched.phase, LearnPhase::New);
+    }
+
+    #[test]
+    fn cram_sessions_ignore_scheduler_and_daily_limits() {
+        let mut l = lib();
+        l.settings.daily_new_limit = 1;
+        let root = l.decks[0].id;
+        let mut ids = Vec::new();
+        for i in 0..3 {
+            ids.push(basic(&mut l, root, &format!("c{i}"), now()));
+        }
+        {
+            let far = l.card_mut(ids[2]).unwrap();
+            far.sched.phase = LearnPhase::Review;
+            far.sched.interval_days = 100.0;
+            far.sched.due = now() + chrono::Duration::days(90);
+        }
+
+        let cram = l.build_cram_session(Scope::All, 100, now()).unwrap();
+        assert_eq!(cram.total(), 3, "the daily new limit does not apply to crams");
+        assert!(cram.queue.iter().all(|(_, k)| *k == QueueKind::Cram));
+        assert!(cram.queue.iter().any(|(id, _)| *id == ids[2]));
+
+        let before = l.card(ids[0]).unwrap().sched.clone();
+        let out = l
+            .record_review(ids[0], Grade::Good, now(), QueueKind::Cram)
+            .unwrap();
+        assert_eq!(l.card(ids[0]).unwrap().sched, before);
+        assert_eq!(out.log.queue_kind, QueueKind::Cram);
+        assert_eq!(out.log.interval_before_days, out.log.interval_after_days);
+
+        let session = l.build_session(Scope::All, now()).unwrap();
+        assert_eq!(session.total(), 1, "one new card still introducible");
+        assert_eq!(session.queue[0].1, QueueKind::New);
+    }
+
+    #[test]
+    fn cram_respects_limit_and_blocked_cards() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        for i in 0..5 {
+            basic(&mut l, root, &format!("c{i}"), now());
+        }
+        let blocked = l.cards[0].id;
+        l.set_card_suspended(blocked, true, now()).unwrap();
+        let cram = l.build_cram_session(Scope::All, 3, now()).unwrap();
+        assert_eq!(cram.total(), 3);
+        assert!(!cram.queue.iter().any(|(id, _)| *id == blocked));
+        assert!(matches!(
+            l.build_cram_session(Scope::All, 0, now()),
+            Err(LibraryError::NothingToStudy)
+        ));
+    }
+
+    #[test]
+    fn reviews_for_lists_newest_first() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let c = basic(&mut l, root, "f", now());
+        let t1 = now() + chrono::Duration::minutes(1);
+        let t2 = now() + chrono::Duration::minutes(2);
+        l.record_review(c, Grade::Again, t1, QueueKind::New).unwrap();
+        l.record_review(c, Grade::Good, t2, QueueKind::Learning)
+            .unwrap();
+        let log = l.reviews_for(c);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log[0].grade, Grade::Good, "newest first");
+        assert_eq!(log[1].grade, Grade::Again);
+    }
+
+    #[test]
+    fn v010_library_json_without_new_fields_still_loads() {
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let c = basic(&mut l, root, "legacy", now());
+        let mut v: serde_json::Value = serde_json::to_value(&l).unwrap();
+
+        // Simulate a 0.1.0 file: drop every field introduced afterwards.
+        for card in v["cards"].as_array_mut().unwrap() {
+            let obj = card.as_object_mut().unwrap();
+            obj.remove("suspended");
+            obj.remove("buried_until");
+        }
+        for deck in v["decks"].as_array_mut().unwrap() {
+            let obj = deck.as_object_mut().unwrap();
+            obj.remove("new_limit_override");
+            obj.remove("review_limit_override");
+        }
+        let settings = v["settings"].as_object_mut().unwrap();
+        settings.remove("queue_order");
+        settings.remove("queue_seed");
+
+        let restored: Library = serde_json::from_value(v).unwrap();
+        let card = restored.card(c).unwrap();
+        assert!(!card.suspended);
+        assert!(card.buried_until.is_none());
+        assert_eq!(restored.settings.queue_order, QueueOrder::DueFirst);
+        assert_eq!(restored.settings.queue_seed, 0);
+        assert_eq!(
+            restored.decks[0].new_limit_override, None,
+            "missing overrides deserialize to inherit"
+        );
     }
 
     #[test]

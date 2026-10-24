@@ -5,7 +5,7 @@
 
 use egui::{Color32, Stroke};
 
-use crate::domain::{DeckColor, Theme};
+use crate::domain::{DeckColor, Grade, Theme};
 
 /// Brand accent (Engram violet).
 pub const ACCENT: Color32 = Color32::from_rgb(124, 92, 255);
@@ -49,6 +49,18 @@ pub fn danger(theme: Theme) -> Color32 {
     match theme {
         Theme::Light => Color32::from_rgb(196, 70, 70),
         Theme::Dark => Color32::from_rgb(235, 100, 100),
+    }
+}
+
+/// Colour for a grade, matching the study-screen buttons and the review
+/// history rows.
+#[must_use]
+pub fn grade_color(grade: Grade, theme: Theme) -> Color32 {
+    match grade {
+        Grade::Again => danger(theme),
+        Grade::Hard => warn(theme),
+        Grade::Good => ok(theme),
+        Grade::Easy => ACCENT,
     }
 }
 

@@ -63,6 +63,20 @@ First functional test build. Scope is deliberately limited (see
 
 ### Added
 
+- Study-queue ordering (`docs/research/queue-ordering.md`): Due-first
+  (unchanged default), Interleaved (new cards spread through the due reviews
+  by the documented `floor(i·(R+N)/N)` formula) and a daily-seeded Shuffle;
+  learning steps always keep their own due order.
+- Per-deck daily limits (`docs/research/deck-local-limits.md`): a deck or any
+  ancestor can override the library-wide new/review limits; the most specific
+  override wins, and daily accounting is per deck subtree.
+- Suspend and bury (`docs/research/card-history-suspend-bury.md`): cards can
+  be paused indefinitely or postponed to a chosen instant; blocked cards leave
+  every queue, due count and forecast, and a review-history browser shows a
+  card's full log.
+- Cram sessions (`docs/research/cram-sessions.md`): study a whole scope while
+  ignoring the scheduler and daily limits; cram answers are logged but never
+  mutate the schedule.
 - Core domain: card model (Basic + Cloze), deck tree with colours and
   re-parenting semantics, SM-2 scheduler (pure, time-injected), study
   sessions, review log, statistics (heatmap/forecast/retention/streak) and

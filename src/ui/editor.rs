@@ -2,7 +2,10 @@
 
 use uuid::Uuid;
 
-use crate::domain::{CardId, CardKind, DeckColor, DeckId, Library, LibrarySettings, SchedParams};
+use crate::domain::{
+    CardId, CardKind, DeckColor, DeckId, Library, LibrarySettings, SchedParams,
+    DEFAULT_DAILY_NEW_LIMIT, DEFAULT_DAILY_REVIEWS_LIMIT,
+};
 
 /// Create-or-edit state for the card editor window.
 #[derive(Debug, Clone, PartialEq)]
@@ -14,6 +17,8 @@ pub struct CardEditor {
     pub back: String,
     pub tags: String,
     pub deck_id: DeckId,
+    /// Paused state (`docs/research/card-history-suspend-bury.md`).
+    pub suspended: bool,
     pub error: Option<String>,
 }
 
@@ -28,6 +33,7 @@ impl CardEditor {
             back: String::new(),
             tags: String::new(),
             deck_id,
+            suspended: false,
             error: None,
         }
     }
@@ -47,6 +53,7 @@ impl CardEditor {
             back,
             tags: card.tags.join(", "),
             deck_id: card.deck_id,
+            suspended: card.suspended,
             error: None,
         })
     }
@@ -85,6 +92,11 @@ pub struct DeckDialog {
     pub parent: Option<DeckId>,
     pub name: String,
     pub color: Option<DeckColor>,
+    /// Per-deck daily-limit overrides (`docs/research/deck-local-limits.md`).
+    pub new_override_on: bool,
+    pub new_override: u32,
+    pub review_override_on: bool,
+    pub review_override: u32,
     pub error: Option<String>,
 }
 
@@ -97,8 +109,24 @@ impl DeckDialog {
             parent,
             name: String::new(),
             color: None,
+            new_override_on: false,
+            new_override: DEFAULT_DAILY_NEW_LIMIT,
+            review_override_on: false,
+            review_override: DEFAULT_DAILY_REVIEWS_LIMIT,
             error: None,
         }
+    }
+
+    /// The new-card limit override to persist (`None` = inherit).
+    #[must_use]
+    pub fn new_limit_override(&self) -> Option<u32> {
+        self.new_override_on.then_some(self.new_override)
+    }
+
+    /// The review limit override to persist (`None` = inherit).
+    #[must_use]
+    pub fn review_limit_override(&self) -> Option<u32> {
+        self.review_override_on.then_some(self.review_override)
     }
 
     /// A dialog pre-filled from an existing deck.
@@ -110,6 +138,14 @@ impl DeckDialog {
             parent: deck.parent,
             name: deck.name.clone(),
             color: deck.color,
+            new_override_on: deck.new_limit_override.is_some(),
+            new_override: deck
+                .new_limit_override
+                .unwrap_or(DEFAULT_DAILY_NEW_LIMIT),
+            review_override_on: deck.review_limit_override.is_some(),
+            review_override: deck
+                .review_limit_override
+                .unwrap_or(DEFAULT_DAILY_REVIEWS_LIMIT),
             error: None,
         })
     }

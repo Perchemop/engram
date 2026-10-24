@@ -193,6 +193,14 @@ pub struct Card {
     pub created: DateTime<Utc>,
     pub modified: DateTime<Utc>,
     pub sched: SchedulingState,
+    /// Paused by the user: never queued for study (`docs/research/
+    /// card-history-suspend-bury.md`).
+    #[serde(default)]
+    pub suspended: bool,
+    /// Postponed by the user until this instant passes; then eligible
+    /// again without any mutation.
+    #[serde(default)]
+    pub buried_until: Option<DateTime<Utc>>,
 }
 
 impl Card {
@@ -218,6 +226,8 @@ impl Card {
             created: now,
             modified: now,
             sched: SchedulingState::new(now, starting_ease),
+            suspended: false,
+            buried_until: None,
         })
     }
 
@@ -230,6 +240,13 @@ impl Card {
         self.kind = kind;
         self.modified = now;
         Ok(())
+    }
+
+    /// True when the card must not enter any study queue right now:
+    /// suspended, or buried until a future instant.
+    #[must_use]
+    pub fn is_blocked(&self, now: DateTime<Utc>) -> bool {
+        self.suspended || self.buried_until.is_some_and(|t| t > now)
     }
 
     /// Replace the tags with a normalised set, bumping `modified`.
