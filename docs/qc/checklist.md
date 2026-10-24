@@ -44,7 +44,7 @@ CI run.
 - [ ] Name/logo original; no vendor marks in UI or installers
 - [ ] UI is original expression (no slavish visual copy)
 - [ ] No known patented techniques implemented where a public alternative exists
-- [ ] Licence clear (MIT OR Apache-2.0); `ATTRIBUTION.md` complete
+- [ ] Licence clear (MIT only — D-023); `ATTRIBUTION.md` complete and accurate
 - [ ] No secrets in git or release binaries
 - [ ] Crash reports sent only with user consent; privacy documented in README
 - [ ] No embedded privileged tokens (issue submission is a pre-filled URL)
@@ -110,3 +110,45 @@ CI run.
 | 2026-10-22/23 | Compile bring-up (passes 1–6) | `39846764231` → `39889290098` | 5 red runs fixed via CI logs only (see PROGRESS.md) |
 | 2026-10-23 | Review-fix slice (PR #1) | PR `39938361670` · main `39939371572` | ✅ Pass on all three runners; PR merged (D-013) |
 | 2026-10-23 | Launch smoke test (arm64 binary, run `39949643789` artefact) | — | ✅ 8s session, no crash; wgpu OK; library-on-first-change behaviour confirmed; human keyboard/visual walk still pending |
+
+## Accessibility smoke test (run when UI is touched)
+
+Run this with the keyboard only, then once with a screen reader. Record the
+result in the run log above. See `ACCESSIBILITY.md` for the severity scale.
+
+- [ ] **Keyboard-only walk-through** of the main flows, mouse untouched:
+      create a deck, create a Basic card and a Cloze card, start and study a
+      session, and grade every card using `1`–`4`.
+- [ ] **Dialogs:** every dialog can be opened from the keyboard and dismissed
+      with `Esc`; focus is visible throughout and never gets trapped.
+- [ ] **Screen-reader spot check:** with Narrator, NVDA or VoiceOver, the
+      focusable controls announce a meaningful name and role, and the study
+      reveal/grade flow is usable.
+- [ ] **Reflow / zoom:** at 200% and in a narrow window, no control is
+      clipped, overlapped or unreachable, and text does not truncate.
+- [ ] **High contrast:** in both themes, text and essential state meet AA
+      contrast, and state is not conveyed by colour alone.
+
+## Launch readiness (guide §25.1)
+
+Checked before a public launch or a major release. Items already covered by
+the release/packaging and legal sections above are not repeated here.
+
+- [ ] `README.md` answers, in order: what this does, why it is useful, how to
+      get started, and where to get more help.
+- [ ] `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`,
+      `VISION.md`, `ACCESSIBILITY.md` and `CONTRIBUTORS.md` are present and
+      current.
+- [ ] The issue forms (`bug_report`, `feature_request`, `accessibility`) and
+      the pull-request template are in place and render correctly on GitHub.
+- [ ] Branch protection on `main` requires the authoritative CI checks
+      (`.ci-required.txt`); direct pushes are disabled.
+- [ ] The stated response expectation (a reply within seven days, maintained
+      in spare time) is published and honest.
+- [ ] Supported platforms and privacy claims in `README.md` match the built
+      binaries and the code — no overstatement.
+- [ ] No false affiliation or "drop-in replacement" claims anywhere in the
+      public docs.
+- [ ] Scanner gates are active and green: gitleaks, CodeQL, cargo-deny, SBOM
+      generated and attached to the release (D-026).
+- [ ] Dependabot is enabled for Cargo and GitHub Actions (D-027).

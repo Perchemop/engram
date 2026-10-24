@@ -1,0 +1,91 @@
+name: Accessibility issue
+description: Report a keyboard, screen-reader, contrast or motion problem.
+title: "[Accessibility]: "
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Accessibility reports take a separate path because they are
+        time-sensitive and need different context from an ordinary bug: how
+        you interact with the app matters more than the raw OS, and a report
+        may block a core task entirely.
+
+        Please be as specific as you can about the assistive technology and
+        the exact keys or gestures involved. See ACCESSIBILITY.md for the
+        project's target standard and known limitations.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What were you trying to do?
+      description: Name the task, such as creating a deck, adding a card or studying a session.
+      placeholder: e.g. Grade a card during a study session using only the keyboard.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected versus actual behaviour
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact keyboard path, gestures or screen-reader commands that trigger the problem.
+      placeholder: |
+        1. Open the study page
+        2. Press ...
+        3. Screen reader announces / focus moves to ...
+    validations:
+      required: true
+  - type: input
+    id: assistive-tech
+    attributes:
+      label: Assistive technology and version
+      description: E.g. NVDA 2024.1, VoiceOver on macOS 14.5, or "keyboard only".
+      placeholder: e.g. NVDA 2024.1
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: e.g. Windows 11 23H2, macOS 14.5, Ubuntu 24.04
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: >-
+        Use the scale in ACCESSIBILITY.md. Critical means a core task is
+        impossible with no workaround; Low means polish with no task blocked.
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+  - type: dropdown
+    id: blocker
+    attributes:
+      label: Is this a blocker?
+      description: Does it stop you using Engram, or force you to use a workaround?
+      options:
+        - "Yes — I cannot use the affected feature at all"
+        - "Yes — but I have a cumbersome workaround"
+        - "No — it is an annoyance"
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: >-
+            This report contains no secrets or personal data beyond what is
+            needed to describe the problem.
+          required: true

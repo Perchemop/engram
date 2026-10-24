@@ -152,3 +152,125 @@ CI. Agent definitions and process docs were updated to remove the fmt
 allowance. *Rejected:* keeping the fmt exception (the owner wants zero Rust
 toolchain executions on the constrained host, removing all ambiguity about
 what counts as "heavy").
+
+---
+
+## 2026-10-24
+
+### D-018 — The local test restriction is a maintainer-machine constraint (guide §26.1)
+
+The "cargo is banned locally" rule (D-017) applies to the maintainer's
+resource-constrained machine, not to the project. Contributors are expected
+and encouraged to run `cargo test --all`, `cargo fmt --all -- --check` and
+`cargo clippy --all-targets -- -D warnings` locally before opening a pull
+request. CI remains the authoritative verification for everyone.
+*Rationale:* the rule exists to protect one machine from restarts under
+load; presenting it as a project-wide norm would wrongly discourage
+contributors from testing their own work. `CONTRIBUTING.md` and
+`docs/development.md` state both halves explicitly. *Rejected:* telling all
+contributors not to run cargo (worse quality, slower feedback); leaving the
+wording ambiguous (contributors would not know which rule applies to them).
+
+### D-019 — Repository is public from day one, with a no-secrets gate and branch protection (guide §26.2)
+
+The repository is public from the first commit, which buys free CI minutes
+and an open contribution surface. In exchange, a hard gate applies from the
+start: **no secret, token or credential is ever committed**, verified by a
+secrets scan (gitleaks, D-026) and by the pre-commit/tree checks, and branch
+protection is enabled on `main` from the beginning. *Rationale:* going public
+first is simpler than migrating a private history later, and the real risk of
+public history is secrets, which a scan plus review closes. *Rejected:*
+starting private (loses free CI and the open model, defers the hard problem);
+public without a secrets gate (unacceptable history risk).
+
+### D-020 — Pull-request flow for every change; branch protection requires the CI check on `main` (guide §26.3)
+
+Every change — human or agent-authored — lands through a pull request. Branch
+protection on `main` requires the authoritative CI check to pass before merge.
+Direct pushes to `main` stop. The `.ci-required.txt` file names the checks
+that decide the verdict (`check` on ubuntu-latest, `build` on windows-latest
+and macos-latest). *Rationale:* the pull request is the review and audit
+surface; requiring the check makes "CI is authoritative" mechanically true
+rather than a convention. *Rejected:* direct pushes to `main` (no review, no
+gate); advisory-only CI (nothing forces green before merge).
+
+### D-021 — Agent automation uses a scoped credential and the project git identity (guide §26.4)
+
+Automated build agents act through a scoped credential with the least
+privilege needed for their task, and all agent-authored commits use the
+project's git identity, **Engram Dev `<dev@example.com>`** — never a personal
+account. If the project ever moves to a GitHub organisation, at least two
+human administrators are recommended for account recovery and separation of
+duties. *Rationale:* a scoped credential limits blast radius if it leaks, and
+a single project identity keeps authorship honest and attributable.
+*Rejected:* a personal-access token with broad scope (over-privileged);
+committing under a personal name (misattributes agent work).
+
+### D-022 — `guide.md` stays local; contributor-facing process lives in the repo (guide §26.5)
+
+The internal build guide (`guide.md`) is not committed or published; it is
+git-ignored. Everything a contributor needs lives in contributor-facing
+documents: `README.md`, `CONTRIBUTING.md` and `GOVERNANCE.md` (with
+`docs/development.md` for engineering workflow). *Rationale:* reference
+material and process notes must not leak into the public repository, but
+contributors must still have a complete, self-contained process.
+*Rejected:* committing the guide (publishes internal reference material and
+notes about other products); leaving process undocumented for contributors.
+
+### D-023 — Licence is deliberately MIT-only, not `MIT OR Apache-2.0` (guide §26.6)
+
+Engram is licensed under **MIT only**. This is a deliberate choice for a
+blank-slate project: MIT is the simplest, most widely understood permissive
+licence, and it satisfies the "use outputs freely" goal without the dual
+`MIT OR Apache-2.0` ceremony. Relicensing remains possible later if a reason
+appears. `Cargo.toml` (`license = "MIT"`), `LICENSE`, `ATTRIBUTION.md` and
+the CI software bill of materials must all report MIT accurately.
+*Rationale:* one clear licence reduces ambiguity for users and for
+downstream packagers. *Rejected:* dual `MIT OR Apache-2.0` (extra ceremony
+with no benefit here); copyleft licences (against the project's goals).
+
+### D-024 — Employer/IP policy check recorded as a maintainer action item (guide §19.6)
+
+The maintainer must confirm that their employer's intellectual-property
+policy does not claim work on this personal, off-hours project, and record
+the outcome. It is tracked as an open action item in
+`docs/assumptions-and-questions.md`. *Rationale:* the check is a real legal
+prerequisite for an unencumbered licence, and recording it makes it
+verifiable rather than assumed. *Rejected:* treating it as obvious and
+leaving no record (unverifiable if the licence is ever questioned).
+
+### D-025 — Accessibility target: WCAG 2.2 AA where feasible
+
+Engram adopts **WCAG 2.2 Level AA where feasible** as its accessibility
+target, with documented exceptions where an immediate-mode native toolkit
+cannot meet a web-content criterion exactly. Priorities are keyboard support,
+AccessKit screen-reader semantics, colour contrast and reduced motion; the
+custom-painted heatmap's lack of per-cell semantics and the absence of
+automated assistive-technology tests are recorded as known limitations.
+*Rationale:* a named, external standard makes "accessible" checkable instead
+of aspirational, and "where feasible" keeps it honest for a native app.
+*Rejected:* no stated standard (unverifiable); claiming full AA compliance
+(untrue and would hide real gaps).
+
+### D-026 — Security and quality scanning in CI: gitleaks, CodeQL, cargo-deny, CycloneDX SBOM
+
+The CI pipeline gains four gates: **gitleaks** (secrets scan on history and
+diff), **CodeQL** (static analysis / SAST), **cargo-deny** (dependency
+licence-class and advisory checks), and a **CycloneDX SBOM** generated and
+attached to releases. New dependencies must fall within the allowed licence
+classes (MIT/Apache-2.0) and be recorded in `ATTRIBUTION.md`.
+*Rationale:* these automate the checks the process already promised (no
+secrets, permissive licences, no known advisories, a reproducible component
+list) and make them evidence rather than intention. *Rejected:* manual-only
+checks (easily forgotten, unverifiable); no SBOM (poor supply-chain
+visibility).
+
+### D-027 — Dependabot enabled for dependency updates
+
+Dependabot is enabled for the repositories' Cargo and GitHub Actions
+dependencies, opening update pull requests that run through the same CI and
+review gates as any other change. *Rationale:* it keeps dependencies current
+and surfaces security advisories early at no ongoing effort, and the normal
+PR flow keeps each update reviewed rather than auto-merged.
+*Rejected:* manual dependency tracking (easy to let drift); auto-merge of
+Dependabot PRs (bypasses review).

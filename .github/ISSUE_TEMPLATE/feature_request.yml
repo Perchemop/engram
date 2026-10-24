@@ -1,0 +1,59 @@
+name: Feature request
+description: Suggest a new capability or an improvement to Engram.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping shape Engram. Please describe the problem first,
+        then your idea for solving it. Check VISION.md and ROADMAP.md — some
+        things are deliberately non-goals or already planned.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >-
+        Describe the need or frustration, not the implementation. What are
+        you doing when this gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like Engram to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >-
+        Any other approaches you thought about, including doing nothing or
+        using a workaround.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app does this touch?
+      options:
+        - Decks and card management
+        - Card editor (Basic / Cloze)
+        - Study and scheduling
+        - Statistics
+        - Import / export and backups
+        - Offline card generator
+        - Settings and preferences
+        - Accessibility
+        - Something else / not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I have read VISION.md and confirmed this is not an explicit non-goal.
+          required: true

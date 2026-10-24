@@ -21,8 +21,9 @@ pub use card::{
 };
 pub use deck::{Deck, DeckColor, DeckError, DeckId, DeckSummary};
 pub use library::{
-    CardFilter, Library, LibraryError, LibrarySettings, QueueKind, ReviewLog, ReviewOutcome, Scope,
-    DEFAULT_DAILY_NEW_LIMIT, DEFAULT_DAILY_REVIEWS_LIMIT, SCHEMA_VERSION,
+    arrange_queue, interleave, CardFilter, Library, LibraryError, LibrarySettings, QueueKind,
+    QueueOrder, ReviewLog, ReviewOutcome, Scope, DEFAULT_DAILY_NEW_LIMIT,
+    DEFAULT_DAILY_REVIEWS_LIMIT, SCHEMA_VERSION,
 };
 pub use scheduler::{
     format_interval, preview_interval, schedule, Grade, LearnPhase, SchedParams, SchedulingState,

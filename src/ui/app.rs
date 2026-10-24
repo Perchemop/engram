@@ -9,7 +9,10 @@ use uuid::Uuid;
 
 use crate::crash_report;
 use crate::data::{self, Prefs};
-use crate::domain::{CardFilter, CardId, DeckColor, Grade, Library, Scope, StudySession, Theme};
+use crate::domain::{
+    format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, Scope,
+    StudySession, Theme,
+};
 use crate::ui::{decks, editor, generate, stats, study, theme};
 use crate::update_check;
 
@@ -63,6 +66,12 @@ pub struct EngramApp {
     pub(crate) session: Option<StudySession>,
     pub(crate) revealed: bool,
     pub(crate) study_scope: Scope,
+    /// Cram mode toggle on the study start screen
+    /// (`docs/research/cram-sessions.md`).
+    pub(crate) cram_mode: bool,
+    pub(crate) cram_limit: usize,
+    /// Card whose review history is shown in the history browser.
+    pub(crate) history_card: Option<CardId>,
 
     // Autosave health: a persistent write failure must not retry every
     // frame (disk full / read-only dir); retries back off to every 5s.
@@ -142,6 +151,9 @@ impl EngramApp {
             session: None,
             revealed: false,
             study_scope: Scope::All,
+            cram_mode: false,
+            cram_limit: 100,
+            history_card: None,
             save_failed: false,
             last_save_attempt: None,
             pending_crash: crash_report::pending_report(),
@@ -340,6 +352,22 @@ impl EngramApp {
         }
     }
 
+    /// Start a cram session over `scope`: every card regardless of due date
+    /// or daily limits; answers are logged but never mutate the schedule
+    /// (`docs/research/cram-sessions.md`).
+    pub(crate) fn start_cram(&mut self, scope: Scope, limit: usize) {
+        self.study_scope = scope;
+        match self.library.build_cram_session(scope, limit, Utc::now()) {
+            Ok(session) => {
+                self.session = Some(session);
+                self.revealed = false;
+                self.page = Page::Study;
+                self.status = "Cram session started".to_string();
+            }
+            Err(e) => self.status = format!("Nothing to cram: {e}"),
+        }
+    }
+
     pub(crate) fn grade_current(&mut self, grade: Grade) {
         let now = Utc::now();
         let Some((card_id, queue_kind)) = self.session.as_ref().and_then(|s| s.current()) else {
@@ -382,6 +410,7 @@ impl EngramApp {
         self.deck_dialog = None;
         self.settings_dialog = None;
         self.confirm_delete_deck = None;
+        self.history_card = None;
     }
 
     // ------------------------------------------------------------------
@@ -462,6 +491,7 @@ impl EngramApp {
                 .library
                 .set_card_kind(id, kind, now)
                 .and_then(|_| self.library.set_card_tags(id, tags, now))
+                .and_then(|_| self.library.set_card_suspended(id, ed.suspended, now))
                 .and_then(|_| {
                     let moves = self.library.card(id).map(|c| c.deck_id != ed.deck_id);
                     match moves {
@@ -497,15 +527,26 @@ impl EngramApp {
             return;
         };
         let now = Utc::now();
+        let new_override = dialog.new_limit_override();
+        let review_override = dialog.review_limit_override();
         let result = match dialog.deck_id {
             Some(id) => self
                 .library
                 .rename_deck(id, &dialog.name)
                 .and_then(|_| self.library.set_deck_color(id, dialog.color))
+                .and_then(|_| {
+                    self.library
+                        .set_deck_limits(id, new_override, review_override)
+                })
                 .map(|_| Some(id)),
             None => self
                 .library
                 .new_deck(dialog.parent, &dialog.name, dialog.color, now)
+                .and_then(|id| {
+                    self.library
+                        .set_deck_limits(id, new_override, review_override)
+                        .map(|()| id)
+                })
                 .map(Some),
         };
         match result {
@@ -739,6 +780,23 @@ impl EngramApp {
             }
         }
 
+        // Review history browser.
+        if self.history_card.is_some() {
+            let mut open = true;
+            let title = self
+                .history_card
+                .map(|id| editor::window_id("Card history", Some(id)))
+                .unwrap_or_default();
+            egui::Window::new(title)
+                .open(&mut open)
+                .resizable(true)
+                .default_width(560.0)
+                .show(ui.ctx(), |ui| self.history_window(ui));
+            if !open {
+                self.history_card = None;
+            }
+        }
+
         // Settings dialog.
         if self.settings_dialog.is_some() {
             let mut open = true;
@@ -750,6 +808,68 @@ impl EngramApp {
                 self.settings_dialog = None;
             }
         }
+    }
+
+    fn history_window(&mut self, ui: &mut Ui) {
+        let Some(card_id) = self.history_card else {
+            return;
+        };
+        let t = self.prefs.theme;
+        let now = Utc::now();
+        if let Some(card) = self.library.card(card_id) {
+            let mut flags = String::new();
+            if card.suspended {
+                flags.push_str(" \u{00b7} suspended");
+            }
+            if card.buried_until.is_some_and(|until| until > now) {
+                flags.push_str(" \u{00b7} buried");
+            }
+            ui.label(
+                RichText::new(format!(
+                    "{} \u{00b7} {} \u{00b7} {} repetition(s){}",
+                    card.kind.label(),
+                    card.sched.phase.label(),
+                    card.sched.reps,
+                    flags
+                ))
+                .weak(),
+            );
+        }
+        ui.separator();
+        let reviews = self.library.reviews_for(card_id);
+        if reviews.is_empty() {
+            ui.label("No reviews recorded for this card yet.");
+            return;
+        }
+        egui::ScrollArea::vertical()
+            .max_height(320.0)
+            .show(ui, |ui| {
+                egui::Grid::new("card_history_grid")
+                    .num_columns(4)
+                    .spacing([10.0, 4.0])
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.strong("When");
+                        ui.strong("Grade");
+                        ui.strong("Queue");
+                        ui.strong("Interval");
+                        ui.end_row();
+                        for r in &reviews {
+                            ui.label(r.at.format("%Y-%m-%d %H:%M").to_string());
+                            ui.label(
+                                RichText::new(r.grade.label())
+                                    .color(theme::grade_color(r.grade, t)),
+                            );
+                            ui.label(RichText::new(r.queue_kind.label()).weak());
+                            ui.label(format!(
+                                "{} \u{2192} {}",
+                                format_interval(r.interval_before_days),
+                                format_interval(r.interval_after_days)
+                            ));
+                            ui.end_row();
+                        }
+                    });
+            });
     }
 
     fn card_editor_window(&mut self, ui: &mut Ui) {
@@ -834,6 +954,11 @@ impl EngramApp {
                                 ui.selectable_value(&mut ed.deck_id, *id, name.clone());
                             }
                         });
+                    ui.end_row();
+
+                    ui.label("Paused");
+                    ui.checkbox(&mut ed.suspended, "Suspended (never queued)")
+                        .on_hover_text("Resume later from the same checkbox.");
                     ui.end_row();
                 });
 
@@ -924,6 +1049,28 @@ impl EngramApp {
                         }
                     });
                     ui.end_row();
+
+                    ui.label("New/day");
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut dialog.new_override_on, "override");
+                        ui.add_enabled(
+                            dialog.new_override_on,
+                            egui::DragValue::new(&mut dialog.new_override).range(0..=500),
+                        )
+                        .on_hover_text("Inherit from the parent deck when unchecked.");
+                    });
+                    ui.end_row();
+
+                    ui.label("Reviews/day");
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut dialog.review_override_on, "override");
+                        ui.add_enabled(
+                            dialog.review_override_on,
+                            egui::DragValue::new(&mut dialog.review_override).range(10..=2000),
+                        )
+                        .on_hover_text("Inherit from the parent deck when unchecked.");
+                    });
+                    ui.end_row();
                 });
 
             if let Some(err) = &dialog.error {
@@ -1010,6 +1157,24 @@ impl EngramApp {
                         egui::DragValue::new(&mut dialog.settings.daily_reviews_limit)
                             .range(10..=2000),
                     );
+                    ui.end_row();
+
+                    ui.label("Queue order");
+                    egui::ComboBox::from_id_salt("settings_queue_order")
+                        .selected_text(dialog.settings.queue_order.label())
+                        .show_ui(ui, |ui| {
+                            for order in [
+                                QueueOrder::DueFirst,
+                                QueueOrder::Interleaved,
+                                QueueOrder::Random,
+                            ] {
+                                ui.selectable_value(
+                                    &mut dialog.settings.queue_order,
+                                    order,
+                                    order.label(),
+                                );
+                            }
+                        });
                     ui.end_row();
 
                     ui.label("Learning steps (minutes)");

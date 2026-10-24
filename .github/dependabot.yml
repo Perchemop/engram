@@ -1,0 +1,28 @@
+# Dependency-update automation (guide §17.10, §20.3).
+#
+# Dependabot checks dependencies against the GitHub Advisory Database and
+# opens an update pull request. A security update is treated as a normal
+# CI-verified change: CI must be green before it is merged (guide §4, §5.4).
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "ci"

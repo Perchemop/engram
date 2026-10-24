@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 
 use crate::domain::{
-    format_interval, render_cloze_blank, CardId, CardKind, LearnPhase, Scope, Theme,
+    format_interval, render_cloze_blank, Card, CardId, CardKind, LearnPhase, Scope, Theme,
 };
 use crate::ui::{app::EngramApp, editor, theme};
 
@@ -237,6 +237,46 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                 app.selected_cards.clear();
                 app.dirty = true;
             }
+            if ui
+                .button("Suspend")
+                .on_hover_text("Pause the selected cards")
+                .clicked()
+            {
+                let now = Utc::now();
+                let ids = app.selected_cards.clone();
+                for id in ids {
+                    let _ = app.library.set_card_suspended(id, true, now);
+                }
+                app.status = "Selected card(s) suspended".to_string();
+                app.dirty = true;
+            }
+            if ui
+                .button("Resume")
+                .on_hover_text("Un-pause the selected cards")
+                .clicked()
+            {
+                let now = Utc::now();
+                let ids = app.selected_cards.clone();
+                for id in ids {
+                    let _ = app.library.set_card_suspended(id, false, now);
+                }
+                app.status = "Selected card(s) resumed".to_string();
+                app.dirty = true;
+            }
+            if ui
+                .button("Bury 1 day")
+                .on_hover_text("Postpone the selected cards for one day")
+                .clicked()
+            {
+                let now = Utc::now();
+                let until = now + chrono::Duration::days(1);
+                let ids = app.selected_cards.clone();
+                for id in ids {
+                    let _ = app.library.bury_card_until(id, until, now);
+                }
+                app.status = "Selected card(s) buried for a day".to_string();
+                app.dirty = true;
+            }
             if ui.button("Clear selection").clicked() {
                 app.selected_cards.clear();
             }
@@ -287,10 +327,17 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                                 .weak()
                                 .color(theme::muted(t)),
                         );
-                        ui.label(due_label(&card.sched.phase, card.sched.due, now, t));
+                        ui.label(due_label(card, now, t));
                         ui.horizontal(|ui| {
                             if ui.small_button("Edit").clicked() {
                                 app.card_editor = editor::CardEditor::edit_card(id, &app.library);
+                            }
+                            if ui
+                                .small_button("Log")
+                                .on_hover_text("Review history")
+                                .clicked()
+                            {
+                                app.history_card = Some(id);
                             }
                             if ui.small_button("✕").on_hover_text("Delete card").clicked() {
                                 let _ = app.library.delete_card(id);
@@ -331,14 +378,20 @@ fn filtered_ids(app: &EngramApp, _now: DateTime<Utc>) -> Vec<CardId> {
     }
 }
 
-fn due_label(phase: &LearnPhase, due: DateTime<Utc>, now: DateTime<Utc>, t: Theme) -> RichText {
-    match phase {
+fn due_label(card: &Card, now: DateTime<Utc>, t: Theme) -> RichText {
+    if card.suspended {
+        return RichText::new("suspended").color(theme::muted(t));
+    }
+    if card.buried_until.is_some_and(|until| until > now) {
+        return RichText::new("buried").color(theme::muted(t));
+    }
+    match card.sched.phase {
         LearnPhase::New => RichText::new("new").color(theme::muted(t)),
         _ => {
-            if due <= now {
+            if card.sched.due <= now {
                 RichText::new("due").color(theme::warn(t))
             } else {
-                let days = (due - now).num_seconds() as f64 / 86_400.0;
+                let days = (card.sched.due - now).num_seconds() as f64 / 86_400.0;
                 RichText::new(format!("in {}", format_interval(days)))
             }
         }

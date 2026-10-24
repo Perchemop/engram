@@ -4,8 +4,8 @@ use chrono::Utc;
 use egui::{Align, Layout, RichText, Ui};
 
 use crate::domain::{
-    preview_interval, render_cloze_blank, render_cloze_revealed, Grade, SchedulingState, Scope,
-    Theme,
+    preview_interval, render_cloze_blank, render_cloze_revealed, Grade, QueueKind, SchedulingState,
+    Scope, Theme,
 };
 use crate::ui::{app::EngramApp, theme};
 
@@ -123,13 +123,28 @@ pub fn show(ui: &mut Ui, app: &mut EngramApp) {
                 ui.with_layout(
                     egui::Layout::top_down_justified(egui::Align::Center),
                     |ui| {
-                        grade_buttons(ui, app, &sched, &params, now, t);
+                        grade_buttons(
+                            ui,
+                            app,
+                            &sched,
+                            &params,
+                            now,
+                            t,
+                            queue_kind == QueueKind::Cram,
+                        );
                     },
                 );
             });
         }
     });
     ui.add_space(8.0);
+    if queue_kind == QueueKind::Cram {
+        ui.label(
+            RichText::new("Cram: answers are logged but your schedule is not changed.")
+                .weak()
+                .color(theme::warn(t)),
+        );
+    }
     ui.label(
         RichText::new("Space: reveal · 1 Again · 2 Hard · 3 Good · 4 Easy · Esc: end session")
             .weak()
@@ -144,11 +159,18 @@ fn grade_buttons(
     params: &crate::domain::SchedParams,
     now: chrono::DateTime<Utc>,
     t: Theme,
+    cram: bool,
 ) {
-    let previews: Vec<(Grade, String)> = Grade::ALL
-        .iter()
-        .map(|g| (*g, preview_interval(now, params, sched, *g)))
-        .collect();
+    let previews: Vec<(Grade, String)> = if cram {
+        // Cram answers never move the schedule, so interval previews would
+        // be misleading — show plain grade labels.
+        Grade::ALL.iter().map(|g| (*g, String::new())).collect()
+    } else {
+        Grade::ALL
+            .iter()
+            .map(|g| (*g, preview_interval(now, params, sched, *g)))
+            .collect()
+    };
     let colors = [
         theme::danger(t),
         theme::warn(t),
@@ -157,8 +179,12 @@ fn grade_buttons(
     ];
     for (i, (grade, preview)) in previews.iter().enumerate() {
         let digit = i + 1;
-        let label =
-            RichText::new(format!("{digit} · {} ({preview})", grade.label())).color(colors[i]);
+        let text = if preview.is_empty() {
+            format!("{digit} · {}", grade.label())
+        } else {
+            format!("{digit} · {} ({preview})", grade.label())
+        };
+        let label = RichText::new(text).color(colors[i]);
         if ui
             .add(egui::Button::new(label).min_size(egui::vec2(110.0, 34.0)))
             .clicked()
@@ -198,38 +224,66 @@ fn start_screen(ui: &mut Ui, app: &mut EngramApp) {
     let counts = app.library.due_counts(app.study_scope, now);
     let total_in_scope = app.library.cards_in_scope(app.study_scope).len();
     ui.add_space(4.0);
+    let ((eff_new, eff_review), source) = app.library.effective_limits(app.study_scope);
+    let limit_caption = match source {
+        Some(id) => format!(
+            " (cap from deck “{}”)",
+            app.library
+                .deck(id)
+                .map(|d| d.name.clone())
+                .unwrap_or_default()
+        ),
+        None => " (library default)".to_string(),
+    };
     ui.label(format!(
-        "{} due · {} in learning steps · {} new queued (daily cap {}) · {} card(s) in scope",
-        counts.review,
-        counts.learning,
-        counts.new_cards,
-        app.library.settings.daily_new_limit,
-        total_in_scope
+        "{} due · {} in learning steps · {} new queued · {} card(s) in scope",
+        counts.review, counts.learning, counts.new_cards, total_in_scope
     ));
     ui.label(
         RichText::new(format!(
-            "Daily limits: {} new, {} reviews (adjustable in Settings).",
-            app.library.settings.daily_new_limit, app.library.settings.daily_reviews_limit
+            "Daily limits: {eff_new} new{limit_caption}, {eff_review} reviews · queue order: {}.",
+            app.library.settings.queue_order.label()
         ))
         .weak()
         .color(theme::muted(t)),
     );
-    ui.add_space(12.0);
+    ui.add_space(8.0);
 
+    // Cram mode: study the whole scope ignoring the scheduler; answers are
+    // logged but never mutate the schedule (docs/research/cram-sessions.md).
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.cram_mode, "Cram whole scope (ignores schedule)");
+        if app.cram_mode {
+            ui.label("max cards:");
+            ui.add(egui::DragValue::new(&mut app.cram_limit).range(1..=10_000));
+        }
+    });
+    ui.add_space(6.0);
+
+    let cram_ok = app.cram_mode && total_in_scope > 0;
     let can_start = counts.total() > 0;
+    let button_text = if app.cram_mode {
+        "Start cram"
+    } else {
+        "Start studying"
+    };
     if ui
         .add_enabled(
-            can_start,
-            egui::Button::new(RichText::new("Start studying").size(18.0))
+            can_start || cram_ok,
+            egui::Button::new(RichText::new(button_text).size(18.0))
                 .min_size(egui::vec2(180.0, 40.0)),
         )
         .clicked()
     {
-        app.start_study(app.study_scope);
+        if app.cram_mode {
+            app.start_cram(app.study_scope, app.cram_limit);
+        } else {
+            app.start_study(app.study_scope);
+        }
     }
-    if !can_start {
+    if !can_start && !cram_ok {
         ui.label(
-            RichText::new("Nothing is due in this scope right now.")
+            RichText::new("Nothing is due in this scope right now — try cram mode.")
                 .weak()
                 .color(theme::muted(t)),
         );

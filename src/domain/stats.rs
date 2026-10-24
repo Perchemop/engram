@@ -137,6 +137,9 @@ pub fn compute(lib: &Library, now: DateTime<Utc>, params_mature_days: f64) -> Li
         if c.sched.phase == LearnPhase::New {
             continue;
         }
+        if c.is_blocked(now) {
+            continue; // suspended / buried cards are not upcoming work
+        }
         let due = c.sched.due.date_naive();
         if due > horizon_end {
             continue;

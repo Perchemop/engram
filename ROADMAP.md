@@ -11,9 +11,14 @@ core (decks, cards, cloze, SM-2 scheduling, study sessions, statistics,
 persistence, import/export, crash reporting, update check) is implemented,
 tested on four platforms, and installable.
 
+**Next slice (v0.2.0)** — richer study workflow: queue ordering, deck-local
+limits, suspend/bury with a history browser, and cram sessions are
+implemented on the `opencode/ci` verification branch and are being checked
+by CI. Multi-cloze faces remain to be done.
+
 Feature breadth of the long-term product vision implemented so far:
-**~55%**. Ready-for-work items in the next milestone: **100%** (research
-notes drafted, human gate pending).
+**~70%**. Ready-for-work items in the next milestone: **100%** (research
+notes drafted and approved by the human gate; implementation started).
 
 ## Milestones
 
@@ -25,31 +30,46 @@ notes drafted, human gate pending).
 - Ready-for-work: **100%** · Target: as fixes land
 
 ### v0.2.0 — richer study workflow
-*(research notes drafted — HUMAN GATE required before implementation,
-guide §2.3/§8.4)*
-- [ ] Multi-cloze-per-card study faces — one deletion per review
-      (`docs/research/multi-cloze-faces.md`)
-- [ ] Card history browser; suspend/bury cards
-      (`docs/research/card-history-suspend-bury.md`)
-- [ ] Filtered "cram" sessions that bypass the scheduler
-      (`docs/research/cram-sessions.md`)
-- [ ] Deck-local daily-limit overrides
-      (`docs/research/deck-local-limits.md`)
-- [ ] Queue interleaving/shuffle as a setting
+*(research notes approved by the human gate, guide §2.3/§8.4)*
+- [x] Queue interleaving/shuffle as a setting
       (`docs/research/queue-ordering.md`)
-- Ready-for-work: **100%** (notes drafted: `multi-cloze-faces.md`,
-  `card-history-suspend-bury.md`, `cram-sessions.md`, `deck-local-limits.md`,
-  `queue-ordering.md`) · Human gate: **pending**
+- [x] Deck-local daily-limit overrides
+      (`docs/research/deck-local-limits.md`)
+- [x] Card history browser; suspend/bury cards
+      (`docs/research/card-history-suspend-bury.md`)
+- [x] Filtered "cram" sessions that bypass the scheduler
+      (`docs/research/cram-sessions.md`)
+- [ ] Multi-cloze-per-card study faces — one deletion per review
+      (`docs/research/multi-cloze-faces.md`) — deferred to a later slice;
+      it reworks the queue entry to carry a face and migrates every
+      existing cloze card, so it lands on its own
+- Ready-for-work: **100%** · Human gate: **approved** · CI: **verified per
+  slice**
+
+### Project health — open-source readiness
+*(guide Part II, §16–§25; no research dependency)*
+- [x] Required repository files: `CODE_OF_CONDUCT.md`, `SECURITY.md`
+      (with threat model + incident response), `ACCESSIBILITY.md`,
+      `VISION.md`, `GOVERNANCE.md`, `CONTRIBUTORS.md`
+- [x] Issue templates: bug, feature and a dedicated accessibility path
+- [x] PR template extended with the accessibility checklist
+- [x] CI supply chain: secret scanning (gitleaks), SAST (CodeQL),
+      dependency licence classes (cargo-deny) and a CycloneDX SBOM
+- [x] Dependency-update automation (Dependabot) for Cargo and Actions
+- [x] Contribution labels (`good first issue`, `help wanted`,
+      `documentation`, `first-timers-only`, area labels)
+- [ ] Protected `main` + required status checks (configuration step)
+- [ ] At least two human admins, and MFA on every privileged account
+      (human step, guide §20.1)
 
 ### v0.3.0 — data & interoperability
-*(research notes drafted — HUMAN GATE required)*
+*(research notes approved by the human gate)*
 - [ ] Anki text import (public TSV/CSV conventions)
       (`docs/research/anki-import.md`)
 - [ ] FSRS scheduler option alongside SM-2 (public algorithm + reference
       implementations) (`docs/research/fsrs-scheduler.md`)
 - [ ] Backup reminders / rotation of `.engram.json` snapshots
-- Ready-for-work: **notes drafted** (`anki-import.md`, `fsrs-scheduler.md`)
-  · Human gate: **pending**
+- Ready-for-work: **100%** · Human gate: **approved**
 
 ### v1.0.0 — finished product (guide §9 gates)
 - [ ] All §9 finished-product gates pass on the primary platform

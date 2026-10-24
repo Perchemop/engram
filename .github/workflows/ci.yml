@@ -13,13 +13,17 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    # Actions are pinned to full commit SHAs (guide §20.3); the trailing
+    # comment records the release the SHA came from. Dependabot keeps them
+    # current (see .github/dependabot.yml).
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
+        toolchain: stable
         components: rustfmt, clippy
     - name: Check formatting
       run: cargo fmt --all -- --check
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
     - name: Clippy (no warnings)
       run: cargo clippy --all-targets -- -D warnings
     - name: Tests
@@ -27,14 +31,14 @@ jobs:
     - name: Build release
       run: cargo build --release
     - name: Upload Cargo.lock (for reproducible clean checkouts)
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
       with:
         name: cargo-lock
         path: Cargo.lock
         if-no-files-found: error
         retention-days: 30
     - name: Upload Linux release binary
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
       with:
         name: engram-linux
         path: target/release/engram
@@ -57,17 +61,65 @@ jobs:
             artifact: engram-linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
     - name: Tests
       run: cargo test --all
     - name: Build release
       run: cargo build --release
     - name: Upload ${{ matrix.artifact }} release binary
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.binary }}
         if-no-files-found: error
         retention-days: 30
+
+  # Supply chain (guide §19.4, §20.3, §20.7): secret scanning, dependency
+  # licence classes, and a CycloneDX SBOM artefact.
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        fetch-depth: 0
+    - name: Secret scanning (gitleaks)
+      uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      with:
+        toolchain: stable
+    - uses: taiki-e/install-action@c1952a69c392b2c5f2eaa845b56120fff5fe49d3 # v2.48.5
+      with:
+        tool: cargo-deny,cargo-cyclonedx
+    - name: Dependency licences (cargo-deny)
+      run: cargo deny check licenses sources
+    - name: Software Bill of Materials (CycloneDX)
+      run: cargo cyclonedx --format json --override-filename sbom
+    - name: Upload SBOM
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+      with:
+        name: sbom-cyclonedx
+        path: '*.cdx.json'
+        if-no-files-found: warn
+        retention-days: 90
+
+  # Static application security testing (guide §20.2, §20.7).
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - name: Initialise CodeQL
+      uses: github/codeql-action/init@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5
+      with:
+        languages: rust
+    - name: Analyse
+      uses: github/codeql-action/analyze@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5

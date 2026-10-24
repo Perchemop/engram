@@ -92,6 +92,13 @@ pub struct Deck {
     /// UI-only collapse state, persisted for convenience.
     pub collapsed: bool,
     pub created: DateTime<Utc>,
+    /// Per-deck override of the library-wide daily new-card limit
+    /// (`None` = inherit from the parent, `docs/research/deck-local-limits.md`).
+    #[serde(default)]
+    pub new_limit_override: Option<u32>,
+    /// Per-deck override of the library-wide daily review limit.
+    #[serde(default)]
+    pub review_limit_override: Option<u32>,
 }
 
 impl Deck {
@@ -110,6 +117,8 @@ impl Deck {
             color,
             collapsed: false,
             created: now,
+            new_limit_override: None,
+            review_limit_override: None,
         }
     }
 }

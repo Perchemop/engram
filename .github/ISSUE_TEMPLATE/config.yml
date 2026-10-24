@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Perchemop/engram/blob/main/SECURITY.md
+    about: >-
+      Do not open a public issue for security problems. Follow SECURITY.md to
+      report a vulnerability privately.
+  - name: Contributing guidelines
+    url: https://github.com/Perchemop/engram/blob/main/CONTRIBUTING.md
+    about: >-
+      How to set up the environment, build, run the tests locally and send a
+      change, including the licence terms for contributions.
