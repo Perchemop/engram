@@ -7,6 +7,31 @@ never rewrite history.
 
 ---
 
+## 2026-10-24 — Step 7 of the guide sequence: ROADMAP expanded + research notes drafted
+
+- **`ROADMAP.md` expanded** (guide §6.2): staged milestones v0.1.x →
+  v1.0.0 with evidence-based readiness (breadth ~55% implemented,
+  next-milestone ready-for-work 100%).
+- **`docs/research/` created** with 7 DRAFT notes (original behaviour
+  summaries, acceptance criteria, edge cases, public URLs only):
+  `multi-cloze-faces.md`, `card-history-suspend-bury.md`, `cram-sessions.md`,
+  `deck-local-limits.md`, `queue-ordering.md`, `anki-import.md`,
+  `fsrs-scheduler.md`.
+- **HUMAN GATE (guide §2.3/§8.4):** these notes require the owner's
+  approval before any dependent implementation Task starts. Approval
+  criteria: original wording, URLs present, no copyrighted paste, no
+  instruction to clone vendor UI.
+
+### Next per the guide (§6.2/§14)
+1. Owner approves / edits / rejects the research notes (the gate).
+2. Human QC walk of the installed app (`docs/qc/checklist.md`).
+3. On approval: approved notes convert to staged Tasks → v0.2.0
+   (Chat → Task → PR → merge → Release).
+4. Small fixes from the QC walk can ship as v0.1.1 without research.
+
+---
+
+
 ## 2026-10-24 — v0.1.0 RELEASED; guide v3 (suite-ready) implemented; cargo banned locally
 
 | Signal | State |
