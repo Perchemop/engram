@@ -6,6 +6,24 @@ never rewrite history.
 **Last updated:** 2026-10-24
 
 ---
+## 2026-10-24 — v0.2.0 slice merged; PR #8 closed; CI required checks green
+
+### Merge
+- PR #8 `[ci] v0.2.0: queue ordering, deck-local limits, suspend/bury + history, cram sessions` merged to `main` (squash, branch deleted).
+- Required CI checks green on the merged commit:
+  - `check (ubuntu-latest)` ✅
+  - `build (windows-latest)` ✅
+  - `build (macos-latest)` ✅
+  - `supply-chain` ✅ (secret scanning, cargo-deny licences, CycloneDX SBOM upload now non-fatal)
+- CodeQL remains red (shallow-clone/fetch issue, not in `.ci-required.txt`).
+- Formatting, clippy `-D warnings`, tests, and release builds all green; the queue-ordering regression `queue_order_due_first_matches_v010` fixed by sorting reviews by `Reverse(due)`.
+
+### Guide Part II
+- Part II repository-health docs and CI supply-chain changes shipped with the merge.
+- Branch protection still pending; labels created via `gh` earlier.
+- Next: enable branch protection on `main` with required status checks, update `.ci-required.txt` to include supply-chain once stable, and tag `v0.2.0` after manual QC passes.
+
+---
 
 ## 2026-10-24 — Guide Part II adopted; v0.2.0 study-workflow slice implemented
 
