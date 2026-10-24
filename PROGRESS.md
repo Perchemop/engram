@@ -3,9 +3,44 @@
 Running status of the project. Newest entries at the top. Append per slice;
 never rewrite history.
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-24
 
 ---
+
+## 2026-10-24 — v0.1.0 RELEASED; guide v3 (suite-ready) implemented; cargo banned locally
+
+| Signal | State |
+| --- | --- |
+| **GitHub Release** | ✅ **v0.1.0 published** — <https://github.com/Perchemop/engram/releases/tag/v0.1.0> — binaries for x86_64-linux, aarch64-linux, Windows, macOS + `checksums-sha256.txt` |
+| Release run | ✅ `release.yml` green: `40045064229` (4 build jobs + release job) |
+| PRs | ✅ #5 (suite-readiness: crash report, update check, release workflow, PR template, ROADMAP, CONTRIBUTING, brand) · #6 (packaging path fix) · #7 (release-notes extraction fix) — all merged |
+| `main` CI | ✅ green after every merge (latest: run for `2ba0e44`) |
+| Local install | `~/.local/bin/engram` updated to the v0.1.0 aarch64 release binary |
+
+### Guide v3 ("Suite-Ready") implementation — complete
+- **§6.1 v0.1.0 hard gate**: all criteria met (installable binary, real
+  workflow, identity, crash stub → full crash reporting, update check,
+  CI green, docs, legal baseline, tagged Release with honest notes).
+- **§7 crash reporting**: panic hook → scrubbed local report → next-launch
+  consent dialog (review / copy / pre-filled issue URL / discard). No
+  embedded tokens. Traceability `R-CR-001…005`.
+- **§7.2 update check**: GitHub Releases API, semver compare, fail-soft
+  offline, 24h auto-check cache, manual Help-menu check. Traceability
+  `R-UC-001…005`.
+- **§8.3 PR template** in force; **ROADMAP.md** + **CONTRIBUTING.md** +
+  **docs/design/brand.md** + `assets/engram.svg` + README privacy section.
+- **§2.5 legal checklist** added to the QC gate and walked for v0.1.0.
+- Policy: **cargo is banned on the local machine outright** (D-017) —
+  agent definitions and process docs updated; fmt is hand-maintained and
+  CI-enforced.
+
+### Open items (next session)
+1. Human keyboard/visual QC walk (app installed and running).
+2. Deferred: per-frame memoisation; post-v0.1.0 research notes are
+   human-gated (guide §2.3) before large new feature Tasks.
+
+---
+
 
 ## 2026-10-23 — ARM64 build, launch smoke test, QC close-out (PR #4 merged)
 

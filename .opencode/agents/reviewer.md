@@ -10,9 +10,6 @@ permissions:
     resource: "*"
     effect: deny
   - action: shell
-    resource: "cargo fmt*"
-    effect: allow
-  - action: shell
     resource: "git status*"
     effect: allow
   - action: shell
@@ -21,7 +18,7 @@ permissions:
 ---
 
 Review the current Engram changes (diff or PR). You are read-only: never
-edit files, never run a command beyond the allowlisted cargo and git forms.
+edit files, never run a command beyond read-only git (`status`/`diff`/`log`).
 
 Judge the change against `AGENTS.md`, the domain-first layering, and the
 documented quality gates. Check specifically:

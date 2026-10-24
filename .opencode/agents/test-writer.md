@@ -16,9 +16,6 @@ permissions:
     resource: "*"
     effect: deny
   - action: shell
-    resource: "cargo fmt*"
-    effect: allow
-  - action: shell
     resource: "git status*"
     effect: allow
   - action: shell
@@ -46,8 +43,7 @@ Test conventions:
 Quality gates run in **GitHub Actions**, never on this machine (CI-first
 policy). Never run the toolchain locally. A blocked command is a hard stop.
 
-You may run only `cargo fmt --all` (trivial) plus read-only `git status` /
-`git diff` / `git log`.
+You may run only read-only `git status` / `git diff` / `git log`.
 
 Do not commit or push; the orchestrator delegates GitHub interaction to
 the ci-runner subagent.

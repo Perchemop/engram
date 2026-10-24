@@ -9,7 +9,8 @@ CI run.
 - [ ] Feature slice is vertical (domain + tests + UI + docs in one slice).
 - [ ] Unit tests cover happy path, boundary, and failure/edge cases.
 - [ ] Headless domain tests need no display; no CPU-heavy work runs locally.
-- [ ] `cargo fmt --all -- --check` passes locally.
+- [ ] Code is rustfmt-clean (CI runs `cargo fmt --all -- --check`; cargo
+      is banned locally).
 - [ ] CI green on GitHub Actions: fmt → clippy `-D warnings` → test --all
       (Linux/Windows/macOS) → release build.
 - [ ] No fake success states / dead controls / placeholder-only data.

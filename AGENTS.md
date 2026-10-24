@@ -13,8 +13,7 @@ gates.
 - Rust only, 100% free OSS.
 - Domain-first: `src/domain/` is pure (no UI, no I/O), fully serialisable
   with serde, testable headlessly.
-- Formatting: `cargo fmt --all -- --check` and formatted code. No trailing
-  whitespace.
+- Formatting: rustfmt-clean (checked in CI). No trailing whitespace.
 - Linting: `cargo clippy --all-targets -- -D warnings` (warnings are
   errors).
 - Testing: add/extend tests when changing behaviour or fixing bugs.
@@ -55,7 +54,8 @@ Every unit of work is a **Task**:
 1. **Chat (Orchestrator)** — plan mode: clarify, write the Task brief
    (requirement IDs, files, acceptance criteria). Never edits code.
 2. **Task (Coder)** — execute exactly one bounded slice: implement, tests,
-   `cargo fmt`, then delegate GitHub interaction to `ci-runner`
+   ensure the change is rustfmt-clean, then delegate GitHub interaction to
+   `ci-runner`
    (commit → push branch → open/update PR).
 3. **GitHub Actions** — the free Task Runner verifies the PR.
 4. **Reviewer** — read-only review of the diff/PR.
@@ -72,15 +72,16 @@ Canonical roles (`.opencode/agents/`): `orchestrator` (Chat, plans only),
 GitHub interaction). All run on free OpenCode models in `subagent` mode;
 conventions: subagents never commit or push except `ci-runner`.
 
-## CI-first (no heavy local runs)
-All CPU/RAM-intensive work runs in **GitHub Actions**, never on the desktop
-host (it is memory-constrained and restarts under load): `cargo test`,
-`cargo clippy`, `cargo check`, and release builds are CI-only. Locally, run
-just `cargo fmt --all` (trivial) and read-only git. Workflow: edit →
-`cargo fmt --all` → commit → push → read the CI run (`gh run view <id>`) →
-route any failures back through the `fixer` subagent. Every push to `main`
-runs fmt check, clippy (`-D warnings`), full tests (Linux/Windows/macOS),
-and a release build.
+## CI-first (no heavy local runs; cargo is banned locally)
+
+**No `cargo` command of any kind runs on this machine — not even `cargo
+fmt`, `cargo check`, or a "small" test** (owner directive 2026-10-24). All
+Rust toolchain work — formatting, clippy, tests, release builds — runs in
+GitHub Actions; fix fmt/clippy findings by editing source and re-running
+CI. Workflow: edit → commit → push → read the CI run (`gh run view <id>`)
+→ route any failures back through the `fixer` subagent. Every push to
+`main` runs fmt check, clippy (`-D warnings`), full tests (Linux/Windows/
+macOS), and a release build.
 
 ## Do not
 - Commit external reference material or notes about other products;

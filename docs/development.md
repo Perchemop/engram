@@ -13,7 +13,7 @@
 | Task | Where |
 |---|---|
 | Editing, reading, docs | Local |
-| `cargo fmt --all` (+ `--check`) | Local (trivial) |
+| `cargo fmt` / `check` / `clippy` / `test` / build | **CI only** — cargo is banned locally outright (2026-10-24) |
 | Read-only `git status/diff`, `gh run view` | Local |
 | `cargo check`, `clippy`, `test`, release build | **CI only** — never locally |
 
@@ -22,8 +22,9 @@
 1. Pick the next unfinished vertical slice (`PROGRESS.md`).
 2. **Chat (plan):** the orchestrator writes the Task brief — requirement
    IDs, files likely touched, acceptance criteria, definition of done.
-3. **Task (execute):** Coder implements the small slice and its tests, runs
-   `cargo fmt --all`, then `ci-runner` executes
+3. **Task (execute):** Coder implements the small slice and its tests
+   (rustfmt-clean by hand; CI enforces `cargo fmt --check`), then
+   `ci-runner` executes
    `~/.config/opencode/scripts/ci.sh run "<description>"`, which commits
    the tree, pushes the `opencode/ci` branch, opens/updates a **pull
    request**, and waits for the checks.
@@ -62,7 +63,7 @@ on the local machine.
   `egui::Panel::top/left/...`), disjoint-field borrows preferred over
   `RefCell`.
 - snake_case, flat explicit modules, doc comments on public API.
-- No trailing whitespace; format with `cargo fmt --all`.
+- No trailing whitespace; code is rustfmt-clean (CI enforces it).
 
 ## Originality
 

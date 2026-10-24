@@ -137,3 +137,18 @@ after: CI green on 4 platforms, CHANGELOG `## [0.1.0]` entry written,
 crash + update-check implemented, legal baseline present (LICENSE,
 ATTRIBUTION, no secrets), and `release.yml` verified to publish the GitHub
 Release with per-platform binaries + SHA-256 checksums.
+
+---
+
+## 2026-10-24
+
+### D-017 — cargo is banned on the local machine outright
+Owner directive: **no `cargo` subcommand of any kind may run locally —
+including `cargo fmt`, `cargo check`, and "small" tests.** This supersedes
+the earlier "fmt is trivial" exception. Formatting is produced by hand
+(rustfmt-clean style) and enforced by CI's `cargo fmt --all -- --check`
+gate; any fmt/clippy/test failure is fixed by editing source and re-running
+CI. Agent definitions and process docs were updated to remove the fmt
+allowance. *Rejected:* keeping the fmt exception (the owner wants zero Rust
+toolchain executions on the constrained host, removing all ambiguity about
+what counts as "heavy").
