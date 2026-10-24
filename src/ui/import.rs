@@ -4,8 +4,7 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use crate::data::{self, ImportMapping, ImportReport};
-use crate::data::import::detect_separator;
+use crate::data::{self, ImportMapping, ImportReport, import::detect_separator};
 use crate::data::export::delimited_records;
 
 #[derive(Debug, Clone)]
@@ -109,10 +108,9 @@ impl ImportDialog {
 
     #[must_use]
     pub fn cloze_hint(&self) -> bool {
-        self.records.iter().any(|r| {
-            r.get(self.front)
-                .map_or(false, |s| s.contains("{{c"))
-        })
+        self.records
+            .iter()
+            .any(|r| r.get(self.front).map_or(false, |s| s.contains("{{c")))
     }
 
     pub fn run_import(
@@ -126,6 +124,12 @@ impl ImportDialog {
             tags: self.tags,
             deck: self.deck,
         };
-        data::import_text_from_str(&self.text, lib, self.deck_id, &mapping, now)
+        data::import_text_from_str(
+            &self.text,
+            lib,
+            self.deck_id,
+            &mapping,
+            now,
+        )
     }
 }

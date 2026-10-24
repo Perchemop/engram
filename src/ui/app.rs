@@ -1184,7 +1184,12 @@ impl EngramApp {
                     .spacing([10.0, 6.0])
                     .show(ui, |ui| {
                         ui.label("Separator");
-                        ui.label(if dialog.separator == '\t' { "TAB" } else { "comma" });
+                        let sep_label = if dialog.separator == '\t' {
+                            "TAB"
+                        } else {
+                            "comma"
+                        };
+                        ui.label(sep_label);
                         ui.end_row();
 
                         ui.label("Front column");
@@ -1192,7 +1197,11 @@ impl EngramApp {
                             .selected_text(format!("Column {}", dialog.front + 1))
                             .show_ui(ui, |ui| {
                                 for i in 0..cols {
-                                    ui.selectable_value(&mut dialog.front, i, format!("Column {}", i + 1));
+                                    ui.selectable_value(
+                                        &mut dialog.front,
+                                        i,
+                                        format!("Column {}", i + 1),
+                                    );
                                 }
                             });
                         ui.end_row();
@@ -1202,7 +1211,11 @@ impl EngramApp {
                             .selected_text(format!("Column {}", dialog.back + 1))
                             .show_ui(ui, |ui| {
                                 for i in 0..cols {
-                                    ui.selectable_value(&mut dialog.back, i, format!("Column {}", i + 1));
+                                    ui.selectable_value(
+                                        &mut dialog.back,
+                                        i,
+                                        format!("Column {}", i + 1),
+                                    );
                                 }
                             });
                         ui.end_row();
@@ -1217,7 +1230,11 @@ impl EngramApp {
                             .show_ui(ui, |ui| {
                                 ui.selectable_value(&mut dialog.tags, None, "None");
                                 for i in 0..cols {
-                                    ui.selectable_value(&mut dialog.tags, Some(i), format!("Column {}", i + 1));
+                                    ui.selectable_value(
+                                        &mut dialog.tags,
+                                        Some(i),
+                                        format!("Column {}", i + 1),
+                                    );
                                 }
                             });
                         ui.end_row();
@@ -1232,7 +1249,11 @@ impl EngramApp {
                             .show_ui(ui, |ui| {
                                 ui.selectable_value(&mut dialog.deck, None, "None");
                                 for i in 0..cols {
-                                    ui.selectable_value(&mut dialog.deck, Some(i), format!("Column {}", i + 1));
+                                    ui.selectable_value(
+                                        &mut dialog.deck,
+                                        Some(i),
+                                        format!("Column {}", i + 1),
+                                    );
                                 }
                             });
                         ui.end_row();
@@ -1240,7 +1261,10 @@ impl EngramApp {
             }
 
             if dialog.header_detected() {
-                ui.label(RichText::new("Header row detected — it will be skipped.").color(theme::muted(t)));
+                ui.label(
+                    RichText::new("Header row detected — it will be skipped.")
+                        .color(theme::muted(t)),
+                );
             }
             if dialog.cloze_hint() {
                 ui.label(RichText::new("Cloze markup ({{cN::…}}) detected in front column.").color(theme::ACCENT));
