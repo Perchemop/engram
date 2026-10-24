@@ -4,8 +4,8 @@ use chrono::Utc;
 use egui::{Align, Layout, RichText, Ui};
 
 use crate::domain::{
-    preview_interval, render_cloze_blank, render_cloze_revealed, Grade, QueueKind,
-    SchedulingState, Scope, Theme,
+    preview_interval, render_cloze_blank, render_cloze_revealed, Grade, QueueKind, SchedulingState,
+    Scope, Theme,
 };
 use crate::ui::{app::EngramApp, theme};
 
@@ -228,7 +228,10 @@ fn start_screen(ui: &mut Ui, app: &mut EngramApp) {
     let limit_caption = match source {
         Some(id) => format!(
             " (cap from deck “{}”)",
-            app.library.deck(id).map(|d| d.name.clone()).unwrap_or_default()
+            app.library
+                .deck(id)
+                .map(|d| d.name.clone())
+                .unwrap_or_default()
         ),
         None => " (library default)".to_string(),
     };
@@ -252,22 +255,14 @@ fn start_screen(ui: &mut Ui, app: &mut EngramApp) {
         ui.checkbox(&mut app.cram_mode, "Cram whole scope (ignores schedule)");
         if app.cram_mode {
             ui.label("max cards:");
-            ui.add(
-                egui::DragValue::new(&mut app.cram_limit)
-                    .range(1..=10_000)
-                    .speed(1.0),
-            );
+            ui.add(egui::DragValue::new(&mut app.cram_limit).range(1..=10_000));
         }
     });
     ui.add_space(6.0);
 
     let cram_ok = app.cram_mode && total_in_scope > 0;
     let can_start = counts.total() > 0;
-    let button_text = if app.cram_mode {
-        "Start cram"
-    } else {
-        "Start studying"
-    };
+    let button_text = if app.cram_mode { "Start cram" } else { "Start studying" };
     if ui
         .add_enabled(
             can_start || cram_ok,

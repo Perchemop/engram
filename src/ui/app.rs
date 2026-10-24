@@ -10,7 +10,8 @@ use uuid::Uuid;
 use crate::crash_report;
 use crate::data::{self, Prefs};
 use crate::domain::{
-    format_interval, CardFilter, CardId, DeckColor, Grade, Library, Scope, StudySession, Theme,
+    format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, Scope, StudySession,
+    Theme,
 };
 use crate::ui::{decks, editor, generate, stats, study, theme};
 use crate::update_check;
@@ -533,7 +534,10 @@ impl EngramApp {
                 .library
                 .rename_deck(id, &dialog.name)
                 .and_then(|_| self.library.set_deck_color(id, dialog.color))
-                .and_then(|_| self.library.set_deck_limits(id, new_override, review_override))
+                .and_then(|_| {
+                    self.library
+                        .set_deck_limits(id, new_override, review_override)
+                })
                 .map(|_| Some(id)),
             None => self
                 .library
@@ -852,9 +856,10 @@ impl EngramApp {
                         ui.end_row();
                         for r in &reviews {
                             ui.label(r.at.format("%Y-%m-%d %H:%M").to_string());
-                            ui.label(RichText::new(r.grade.label()).color(theme::grade_color(
-                                r.grade, t,
-                            )));
+                            ui.label(
+                                RichText::new(r.grade.label())
+                                    .color(theme::grade_color(r.grade, t)),
+                            );
                             ui.label(RichText::new(r.queue_kind.label()).weak());
                             ui.label(format!(
                                 "{} \u{2192} {}",
@@ -1159,9 +1164,9 @@ impl EngramApp {
                         .selected_text(dialog.settings.queue_order.label())
                         .show_ui(ui, |ui| {
                             for order in [
-                                crate::domain::QueueOrder::DueFirst,
-                                crate::domain::QueueOrder::Interleaved,
-                                crate::domain::QueueOrder::Random,
+                                QueueOrder::DueFirst,
+                                QueueOrder::Interleaved,
+                                QueueOrder::Random,
                             ] {
                                 ui.selectable_value(
                                     &mut dialog.settings.queue_order,

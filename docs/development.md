@@ -44,6 +44,35 @@ PR opened/updated for review (merged when green — D-013); tracking docs
 updated; no fake success states; change small and reviewable; no heavy work
 on the local machine.
 
+## Definition of Done (project-level additions, guide §25)
+
+Beyond the per-slice list, a change is only truly done when the following
+hold. These are the Part II requirements and apply to the repository as a
+whole, checked before a release and whenever the relevant surface changes.
+
+- The repository's baseline documents are current: `LICENSE`, `README.md`,
+  `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+- `SECURITY.md` is present and accurate (private reporting path, scope,
+  threat model, incident response).
+- Any new dependency is within the allowed licence classes (MIT/Apache-2.0)
+  and is recorded in `ATTRIBUTION.md`; the SBOM reflects it.
+- The diff and the history contain no secrets or tokens.
+- Static analysis (SAST) is clean, or every finding is triaged and recorded.
+- The protected branch and its required checks are configured, so `main`
+  cannot receive an unverified change.
+- UI changes pass the accessibility checklist in the pull-request template and
+  carry their own accessibility acceptance criteria.
+- Documentation has an accessible structure (proper heading hierarchy,
+  descriptive link text, no reliance on colour alone).
+- `CHANGELOG.md`, `PROGRESS.md` and `REQUIREMENTS_TRACEABILITY.md` are
+  updated to match reality.
+- When an accessibility or security issue is fixed, the reporter is told in
+  the issue that it is resolved.
+- No heavy toolchain work ran on the maintainer's local machine (cargo is
+  banned there; D-017).
+- Commits are authored under the project identity, **Engram Dev
+  `<dev@example.com>`**, never a personal account.
+
 ## Testing
 
 - Unit tests live beside the code in `src/domain/*` and `src/data/*`;

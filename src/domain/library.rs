@@ -781,10 +781,7 @@ impl Library {
     /// Returns the limits and the deck (if any) whose override applied.
     #[must_use]
     pub fn effective_limits(&self, scope: Scope) -> ((u32, u32), Option<DeckId>) {
-        let defaults = (
-            self.settings.daily_new_limit,
-            self.settings.daily_reviews_limit,
-        );
+        let defaults = (self.settings.daily_new_limit, self.settings.daily_reviews_limit);
         let root = match scope {
             Scope::All => return (defaults, None),
             Scope::Deck(id) => id,
@@ -884,8 +881,7 @@ impl Library {
         now: DateTime<Utc>,
     ) -> Result<StudySession, LibraryError> {
         let ((new_limit, review_limit), _) = self.effective_limits(scope);
-        let (introduced_today, reviews_today) =
-            self.todays_accounting(scope, now.date_naive());
+        let (introduced_today, reviews_today) = self.todays_accounting(scope, now.date_naive());
         let fresh_budget = (new_limit as usize).saturating_sub(introduced_today);
         let review_budget = (review_limit as usize).saturating_sub(reviews_today);
 
@@ -972,9 +968,8 @@ pub fn arrange_queue(
     review: Vec<(DateTime<Utc>, CardId)>,
     fresh: Vec<CardId>,
 ) -> Vec<(CardId, QueueKind)> {
-    let mut queue: Vec<(CardId, QueueKind)> = Vec::with_capacity(
-        learning.len() + review.len() + fresh.len(),
-    );
+    let mut queue: Vec<(CardId, QueueKind)> =
+        Vec::with_capacity(learning.len() + review.len() + fresh.len());
     for (_, id) in learning {
         queue.push((id, QueueKind::Learning));
     }
@@ -1726,7 +1721,11 @@ mod tests {
         }
 
         let cram = l.build_cram_session(Scope::All, 100, now()).unwrap();
-        assert_eq!(cram.total(), 3, "the daily new limit does not apply to crams");
+        assert_eq!(
+            cram.total(),
+            3,
+            "the daily new limit does not apply to crams"
+        );
         assert!(cram.queue.iter().all(|(_, k)| *k == QueueKind::Cram));
         assert!(cram.queue.iter().any(|(id, _)| *id == ids[2]));
 
@@ -1768,7 +1767,8 @@ mod tests {
         let c = basic(&mut l, root, "f", now());
         let t1 = now() + chrono::Duration::minutes(1);
         let t2 = now() + chrono::Duration::minutes(2);
-        l.record_review(c, Grade::Again, t1, QueueKind::New).unwrap();
+        l.record_review(c, Grade::Again, t1, QueueKind::New)
+            .unwrap();
         l.record_review(c, Grade::Good, t2, QueueKind::Learning)
             .unwrap();
         let log = l.reviews_for(c);

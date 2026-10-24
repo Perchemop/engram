@@ -7,6 +7,51 @@ never rewrite history.
 
 ---
 
+## 2026-10-24 — Guide Part II adopted; v0.2.0 study-workflow slice implemented
+
+### v0.2.0 slice (queue ordering, deck limits, suspend/bury + history, cram)
+- Four of the five gated v0.2.0 research notes are implemented: queue
+  ordering (Due-first / Interleaved / daily-seeded Shuffle), per-deck
+  daily-limit overrides resolved up the deck tree, suspend + bury with a
+  review-history browser, and cram sessions that log answers without
+  mutating the schedule.
+- Domain changes stay pure and time-injected; every new persisted field has
+  a serde default, so a 0.1.0 `.engram.json` still loads
+  (`v010_library_json_without_new_fields_still_loads`).
+- UI: the study start screen gains the cram toggle, an effective-limit
+  caption naming the deck that supplied the cap, and the queue-order label;
+  Settings gains the queue-order selector; the deck dialog gains limit
+  overrides; the card editor and deck table gain suspend/bury controls and
+  a per-card "Log" history window.
+- **Deferred:** multi-cloze faces (`docs/research/multi-cloze-faces.md`) —
+  it reworks the queue entry to carry a face and migrates every cloze card,
+  so it lands as its own slice.
+- CI: verification run in progress on `opencode/ci`.
+
+### Guide Part II (§16–§25) — open-source readiness
+- Repository-health files added: `CODE_OF_CONDUCT.md`, `SECURITY.md`
+  (private reporting + threat model + incident response), `ACCESSIBILITY.md`
+  (WCAG 2.2 AA target), `VISION.md`, `GOVERNANCE.md`, `CONTRIBUTORS.md`.
+- `.github/ISSUE_TEMPLATE/` added: bug, feature and accessibility forms plus
+  `config.yml`; the PR template gains the accessibility checklist.
+- CI supply chain added: secret scanning (gitleaks), SAST (CodeQL),
+  dependency licence classes (cargo-deny via `deny.toml`) and a CycloneDX
+  SBOM; Dependabot configured for Cargo and Actions; every Action pinned to
+  a commit SHA.
+- Contribution labels created (`good first issue`, `help wanted`,
+  `documentation`, `first-timers-only`, and area labels including
+  `accessibility` and `security`).
+- Repository-local git identity set to `Engram Dev <dev@example.com>`
+  (guide §5.5); `ci.sh` already asserts it before committing.
+- Guide §26 open questions recorded as decisions in `DECISIONS.md`.
+
+### Next
+1. Confirm CI green for the v0.2.0 slice, then merge.
+2. Enable branch protection on `main` with required status checks.
+3. Implement multi-cloze faces, then the v0.3.0 slice (Anki import, FSRS).
+
+---
+
 ## 2026-10-24 — Step 7 of the guide sequence: ROADMAP expanded + research notes drafted
 
 - **`ROADMAP.md` expanded** (guide §6.2): staged milestones v0.1.x →

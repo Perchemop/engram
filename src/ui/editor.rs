@@ -139,9 +139,7 @@ impl DeckDialog {
             name: deck.name.clone(),
             color: deck.color,
             new_override_on: deck.new_limit_override.is_some(),
-            new_override: deck
-                .new_limit_override
-                .unwrap_or(DEFAULT_DAILY_NEW_LIMIT),
+            new_override: deck.new_limit_override.unwrap_or(DEFAULT_DAILY_NEW_LIMIT),
             review_override_on: deck.review_limit_override.is_some(),
             review_override: deck
                 .review_limit_override

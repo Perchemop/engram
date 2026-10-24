@@ -34,6 +34,30 @@
   generator shipped in V1 (D-009); an optional BYO-API-key generator is a
   candidate for a later slice and was never promised in V1 scope.
 
+## Open maintainer actions
+
+- **Employer/IP-policy check (guide §19.6, D-024).** Confirm that the
+  maintainer's employer's intellectual-property policy does not claim this
+  off-hours, personal-account project, and record the outcome here. The MIT
+  licence is only clean if this is settled. *Owner: maintainer. Status:
+  open.*
+- **Account security (guide §20.1, D-021).** Enable multi-factor
+  authentication on the GitHub account that owns the repository, and if the
+  project ever moves to a GitHub organisation, add at least a second human
+  administrator for account recovery and separation of duties. *Owner:
+  maintainer. Status: open.*
+
+## Metrics policy
+
+- **Measurement is intentionally minimal (guide §23.5).** Engram has no
+  in-app telemetry by design. Discovery, usage and retention are judged only
+  from public signals — GitHub stars and forks, release download counts and,
+  if consulted at all, GitHub Insights — and never from user data. There is
+  no server to collect anything, so any future metric would have to be added
+  deliberately; if that ever happens it must be aggregate, public and
+  opt-in, and it must be recorded in this document. *Status: policy; revisit
+  only with a concrete reason.*
+
 ## Resolved during the 2026-10-24 guide update
 - **Q4 (suite?)** → Engram is a standalone app; crash-report and
   update-check ship as in-app modules designed for later extraction

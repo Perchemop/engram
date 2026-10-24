@@ -237,7 +237,11 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                 app.selected_cards.clear();
                 app.dirty = true;
             }
-            if ui.button("Suspend").on_hover_text("Pause the selected cards").clicked() {
+            if ui
+                .button("Suspend")
+                .on_hover_text("Pause the selected cards")
+                .clicked()
+            {
                 let now = Utc::now();
                 let ids = app.selected_cards.clone();
                 for id in ids {
@@ -246,7 +250,11 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                 app.status = "Selected card(s) suspended".to_string();
                 app.dirty = true;
             }
-            if ui.button("Resume").on_hover_text("Un-pause the selected cards").clicked() {
+            if ui
+                .button("Resume")
+                .on_hover_text("Un-pause the selected cards")
+                .clicked()
+            {
                 let now = Utc::now();
                 let ids = app.selected_cards.clone();
                 for id in ids {
