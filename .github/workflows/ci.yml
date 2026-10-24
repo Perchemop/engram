@@ -99,7 +99,7 @@ jobs:
     - name: Dependency licences (cargo-deny)
       run: cargo deny check licenses sources
     - name: Software Bill of Materials (CycloneDX)
-      run: cargo cyclonedx --format json --output sbom.cdx.json
+      run: cargo cyclonedx --format json --override-filename sbom.cdx.json
     - name: Upload SBOM
       uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
       with:
