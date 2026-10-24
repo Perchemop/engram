@@ -811,8 +811,6 @@ impl EngramApp {
             }
         }
 
-<<<<<<< HEAD
-=======
         // Import text dialog.
         if self.import_dialog.is_some() {
             let mut open = true;
@@ -826,7 +824,6 @@ impl EngramApp {
             }
         }
 
->>>>>>> opencode/ci
         // Settings dialog.
         if self.settings_dialog.is_some() {
             let mut open = true;
