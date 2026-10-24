@@ -140,8 +140,12 @@ pub fn import_text_from_str(
             }
         }
 
-        let front = sanitize_html(field(fields, mapping.front)).trim().to_string();
-        let back = sanitize_html(field(fields, mapping.back)).trim().to_string();
+        let front = sanitize_html(field(fields, mapping.front))
+            .trim()
+            .to_string();
+        let back = sanitize_html(field(fields, mapping.back))
+            .trim()
+            .to_string();
         if front.is_empty() || back.is_empty() {
             report.skipped_invalid += 1;
             continue; // would fail Library::add_card validation
@@ -245,7 +249,11 @@ fn field(fields: &[String], index: usize) -> &str {
 /// A header row is the first content row when its first field starts with
 /// `Front`/`Question` (case-insensitive).
 fn is_header_row(fields: &[String]) -> bool {
-    let first = fields.first().map_or("", String::as_str).trim().to_lowercase();
+    let first = fields
+        .first()
+        .map_or("", String::as_str)
+        .trim()
+        .to_lowercase();
     first.starts_with("front") || first.starts_with("question")
 }
 
@@ -494,7 +502,10 @@ mod tests {
         assert_eq!(report.imported, 1);
         let card_deck = lib.cards[0].deck_id;
         assert_ne!(card_deck, deck);
-        assert_eq!(lib.deck_path(card_deck).unwrap(), vec!["Languages", "Japanese"]);
+        assert_eq!(
+            lib.deck_path(card_deck).unwrap(),
+            vec!["Languages", "Japanese"]
+        );
         assert_eq!(lib.cards[0].tags, vec!["tag"]);
 
         // A second import reuses the decks instead of duplicating names.
@@ -553,7 +564,10 @@ mod tests {
         assert_eq!(sanitize_html("a<br />b"), "a\nb");
         assert_eq!(sanitize_html("<b>x</b><i>y</i>"), "xy");
         // Unknown tags are left verbatim (V1 cards are plain text).
-        assert_eq!(sanitize_html("keep <div>this</div>"), "keep <div>this</div>");
+        assert_eq!(
+            sanitize_html("keep <div>this</div>"),
+            "keep <div>this</div>"
+        );
         // A bare `<` without a closing `>` is not a tag.
         assert_eq!(sanitize_html("2 < 3 and 4 > 3"), "2 < 3 and 4 > 3");
     }
@@ -601,7 +615,10 @@ mod tests {
             deck: Some(4),
         };
         let json = serde_json::to_string(&mapping).unwrap();
-        assert_eq!(serde_json::from_str::<ImportMapping>(&json).unwrap(), mapping);
+        assert_eq!(
+            serde_json::from_str::<ImportMapping>(&json).unwrap(),
+            mapping
+        );
 
         let report = ImportReport {
             imported: 3,
