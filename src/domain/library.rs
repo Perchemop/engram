@@ -781,7 +781,10 @@ impl Library {
     /// Returns the limits and the deck (if any) whose override applied.
     #[must_use]
     pub fn effective_limits(&self, scope: Scope) -> ((u32, u32), Option<DeckId>) {
-        let defaults = (self.settings.daily_new_limit, self.settings.daily_reviews_limit);
+        let defaults = (
+            self.settings.daily_new_limit,
+            self.settings.daily_reviews_limit,
+        );
         let root = match scope {
             Scope::All => return (defaults, None),
             Scope::Deck(id) => id,

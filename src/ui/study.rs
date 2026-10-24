@@ -262,7 +262,11 @@ fn start_screen(ui: &mut Ui, app: &mut EngramApp) {
 
     let cram_ok = app.cram_mode && total_in_scope > 0;
     let can_start = counts.total() > 0;
-    let button_text = if app.cram_mode { "Start cram" } else { "Start studying" };
+    let button_text = if app.cram_mode {
+        "Start cram"
+    } else {
+        "Start studying"
+    };
     if ui
         .add_enabled(
             can_start || cram_ok,

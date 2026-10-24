@@ -10,8 +10,8 @@ use uuid::Uuid;
 use crate::crash_report;
 use crate::data::{self, Prefs};
 use crate::domain::{
-    format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, Scope, StudySession,
-    Theme,
+    format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, Scope,
+    StudySession, Theme,
 };
 use crate::ui::{decks, editor, generate, stats, study, theme};
 use crate::update_check;
