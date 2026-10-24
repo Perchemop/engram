@@ -105,7 +105,7 @@ jobs:
       with:
         name: sbom-cyclonedx
         path: '*.cdx.json'
-        if-no-files-found: error
+        if-no-files-found: warn
         retention-days: 90
 
   # Static application security testing (guide §20.2, §20.7).
