@@ -67,8 +67,8 @@ jobs:
     - name: Extract release notes from CHANGELOG
       run: |
         VERSION="${GITHUB_REF_NAME#v}"
-        awk -v section="## [$VERSION]" '
-          $0 == section { found = 1; next }
+        awk -v prefix="## [$VERSION]" '
+          index($0, prefix) == 1 { found = 1; next }
           /^## \[/ && found { exit }
           found { print }
         ' CHANGELOG.md > notes.md || true
