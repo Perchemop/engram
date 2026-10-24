@@ -327,7 +327,7 @@ pub fn show_cards(ui: &mut Ui, app: &mut EngramApp) {
                                 .weak()
                                 .color(theme::muted(t)),
                         );
-                        ui.label(due_label(&card, now, t));
+                        ui.label(due_label(card, now, t));
                         ui.horizontal(|ui| {
                             if ui.small_button("Edit").clicked() {
                                 app.card_editor = editor::CardEditor::edit_card(id, &app.library);
