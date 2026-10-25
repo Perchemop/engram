@@ -1267,25 +1267,26 @@ impl EngramApp {
                 );
             }
             if dialog.cloze_hint() {
-                ui.label(RichText::new("Cloze markup ({{cN::…}}) detected in front column.").color(theme::ACCENT));
+                ui.label(
+                    RichText::new("Cloze markup ({{cN::…}}) detected in front column.")
+                        .color(theme::ACCENT),
+                );
             }
 
             ui.add_space(4.0);
             ui.label(RichText::new("Preview (first 10 rows):").strong());
-            egui::ScrollArea::both()
-                .max_height(180.0)
-                .show(ui, |ui| {
-                    egui::Grid::new("import_preview")
-                        .spacing([8.0, 2.0])
-                        .show(ui, |ui| {
-                            for row in dialog.preview_rows() {
-                                for cell in row {
-                                    ui.label(crate::ui::decks::truncate(cell, 40));
-                                }
-                                ui.end_row();
+            egui::ScrollArea::both().max_height(180.0).show(ui, |ui| {
+                egui::Grid::new("import_preview")
+                    .spacing([8.0, 2.0])
+                    .show(ui, |ui| {
+                        for row in dialog.preview_rows() {
+                            for cell in row {
+                                ui.label(crate::ui::decks::truncate(cell, 40));
                             }
-                        });
-                });
+                            ui.end_row();
+                        }
+                    });
+            });
 
             ui.add_space(4.0);
             ui.horizontal(|ui| {
