@@ -10,6 +10,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+pub mod release;
+
 /// Human-visible releases page.
 pub const RELEASES_PAGE_URL: &str = "https://github.com/Perchemop/engram/releases/latest";
 /// GitHub REST endpoint for the latest release.
@@ -57,9 +59,12 @@ pub fn classify(current: &str, latest_tag: &str) -> UpdateStatus {
     }
 }
 
-/// Fetch the latest release tag from the GitHub API (network). Fails soft:
-/// any error becomes a string for the UI.
-pub fn fetch_latest_tag() -> Result<String, String> {
+/// Fetch the latest release and parse it (network). Fails soft: any error
+/// becomes a string for the UI.
+///
+/// Unlike [`fetch_latest_tag`] this keeps the assets, so the caller can choose
+/// the file for this platform and verify its SHA-256 before running it.
+pub fn fetch_release() -> Result<release::Release, String> {
     let agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(10)))
         .build()
@@ -74,7 +79,13 @@ pub fn fetch_latest_tag() -> Result<String, String> {
         .body_mut()
         .read_to_string()
         .map_err(|e| format!("read failed: {e}"))?;
-    parse_tag_name(&text).ok_or_else(|| "response had no tag_name".to_string())
+    release::parse_release(&text, release::REPO)
+}
+
+/// Fetch the latest release tag from the GitHub API (network). Fails soft:
+/// any error becomes a string for the UI.
+pub fn fetch_latest_tag() -> Result<String, String> {
+    fetch_release().map(|r| r.tag)
 }
 
 /// Extract `tag_name` from a GitHub release JSON payload.
