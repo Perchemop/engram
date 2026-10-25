@@ -123,11 +123,11 @@ jobs:
         # invalid alert-range file ("error processing shallow info").
         fetch-depth: 0
     - name: Initialise CodeQL
-      uses: github/codeql-action/init@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5
+      uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
       with:
         languages: rust
     - name: Analyse
-      uses: github/codeql-action/analyze@f09c1c0a94de965c15400f5634aa42fac8fb8f88 # v3.27.5
+      uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
 
   # Packaging declaration check (guide §4): dist-workspace.toml is the source
   # of truth for installers and targets. `dist plan` resolves it and prints
