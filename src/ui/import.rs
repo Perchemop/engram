@@ -4,8 +4,7 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use crate::data::{self, ImportMapping, ImportReport};
-use crate::data::import::detect_separator;
+use crate::data::{self, import::detect_separator, ImportMapping, ImportReport};
 use crate::data::export::delimited_records;
 
 #[derive(Debug, Clone)]
