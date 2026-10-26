@@ -150,7 +150,10 @@ pub fn safe_web_link(url: &str) -> bool {
 /// Constant-time in the compared length so a partial match cannot be timed.
 #[must_use]
 pub fn verify_sha256_hex(actual: &str, expected: &str) -> bool {
-    let (a, e) = (actual.trim().to_ascii_lowercase(), expected.trim().to_ascii_lowercase());
+    let (a, e) = (
+        actual.trim().to_ascii_lowercase(),
+        expected.trim().to_ascii_lowercase(),
+    );
     if !is_hex64(&a) || !is_hex64(&e) {
         return false;
     }
@@ -235,7 +238,10 @@ fn release_from_value(value: &serde_json::Value, repo: &str) -> Result<Release, 
         .map(|list| {
             list.iter()
                 .filter_map(|a| {
-                    let name = a["name"].as_str().filter(|n| valid_file_name(n))?.to_string();
+                    let name = a["name"]
+                        .as_str()
+                        .filter(|n| valid_file_name(n))?
+                        .to_string();
                     let url = a["browser_download_url"]
                         .as_str()
                         .filter(|u| u.starts_with(&prefix) && !u.contains(['?', '#', '\\']))?
@@ -264,7 +270,10 @@ fn release_from_value(value: &serde_json::Value, repo: &str) -> Result<Release, 
         tag,
         published_at: value["published_at"].as_str().and_then(parse_rfc3339),
         html_url,
-        notes: value["body"].as_str().map(|b| truncate(b, MAX_NOTES)).unwrap_or_default(),
+        notes: value["body"]
+            .as_str()
+            .map(|b| truncate(b, MAX_NOTES))
+            .unwrap_or_default(),
         prerelease: value["prerelease"].as_bool().unwrap_or(false),
         assets,
     })
@@ -277,7 +286,9 @@ pub fn tag_from_redirect(location: &str, repo: &str) -> Option<String> {
     let rest = location.strip_prefix(prefix.as_str())?;
     (!rest.is_empty()
         && rest.len() <= 64
-        && rest.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-+".contains(&b)))
+        && rest
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._-+".contains(&b)))
     .then(|| rest.to_string())
 }
 
@@ -462,13 +473,20 @@ mod tests {
         assert_eq!(release.published_at, Some(1_792_921_806));
         assert_eq!(release.assets.len(), 5);
         // GitHub's `digest` supplies the checksum without a sums file.
-        assert!(release.assets.iter().all(|a| a.sha256.as_deref() == Some(HASH)));
+        assert!(release
+            .assets
+            .iter()
+            .all(|a| a.sha256.as_deref() == Some(HASH)));
     }
 
     #[test]
     fn picks_the_asset_for_each_supported_platform() {
         let release = parse_release(&release_json(), REPO).expect("fixture must parse");
-        let pick = |os, arch| release.asset_for(platform(os, arch)).map(|a| a.name.clone());
+        let pick = |os, arch| {
+            release
+                .asset_for(platform(os, arch))
+                .map(|a| a.name.clone())
+        };
         assert_eq!(
             pick(Os::Linux, Arch::X64).as_deref(),
             Some("engram-0.2.0-x86_64-unknown-linux-gnu")
@@ -498,7 +516,9 @@ mod tests {
         );
         let release = parse_release(&json, REPO).expect("fixture must parse");
         assert_eq!(
-            release.asset_for(platform(Os::MacOs, Arch::Arm64)).map(|a| a.name.as_str()),
+            release
+                .asset_for(platform(Os::MacOs, Arch::Arm64))
+                .map(|a| a.name.as_str()),
             Some(name)
         );
     }
