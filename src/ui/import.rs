@@ -110,7 +110,7 @@ impl ImportDialog {
     pub fn cloze_hint(&self) -> bool {
         self.records
             .iter()
-            .any(|r| r.get(self.front).map_or(false, |s| s.contains("{{c")))
+            .any(|r| r.get(self.front).map(|s| s.contains("{{c")).unwrap_or(false))
     }
 
     pub fn run_import(
