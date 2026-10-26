@@ -1,5 +1,5 @@
 ---
-description: Engram Coder (Task mode). Executes one bounded Task: implements, tests, commits, pushes. Relies on GitHub Actions, never runs heavy local builds.
+description: "Engram Coder (Task mode). Executes one bounded Task - implements, tests, commits, pushes. Relies on GitHub Actions, never runs heavy local builds."
 mode: subagent
 model: opencode/glm-5.3-flash-free#high
 permissions:

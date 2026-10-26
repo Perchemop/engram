@@ -1,6 +1,6 @@
 # Research note — Anki text import
 
-**Status:** DRAFT — awaiting human approval (guide §2.3/§8.4).
+**Status:** APPROVED — human approval granted 2026-10-24 (guide §2.3/§8.4).
 **Milestone target:** v0.3.0.
 **Sources (public, capability-level only):**
 - Anki manual, importing text files (tab/semicolon separated, one card per

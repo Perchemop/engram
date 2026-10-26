@@ -15,4 +15,7 @@ pub enum DataError {
 
     #[error("CSV import error: {0}")]
     Csv(String),
+
+    #[error("Library error: {0}")]
+    Library(#[from] crate::domain::library::LibraryError),
 }
