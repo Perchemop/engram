@@ -548,7 +548,9 @@ mod tests {
             assert!(release.is_some_and(|r| r.assets.is_empty()));
         }
         assert_eq!(
-            parse_release(r#"{"message":"Not Found"}"#, REPO).err().as_deref(),
+            parse_release(r#"{"message":"Not Found"}"#, REPO)
+                .err()
+                .as_deref(),
             Some("no releases yet")
         );
         assert!(parse_release("<html>", REPO).is_err());
@@ -563,11 +565,19 @@ mod tests {
             {"tag_name":"v0.2.0","prerelease":false,"draft":false,"published_at":"2026-10-22T00:00:00Z","assets":[]}
         ]"#;
         assert_eq!(
-            parse_release_list(json, REPO, false).ok().flatten().map(|r| r.tag).as_deref(),
+            parse_release_list(json, REPO, false)
+                .ok()
+                .flatten()
+                .map(|r| r.tag)
+                .as_deref(),
             Some("v0.2.0")
         );
         assert_eq!(
-            parse_release_list(json, REPO, true).ok().flatten().map(|r| r.tag).as_deref(),
+            parse_release_list(json, REPO, true)
+                .ok()
+                .flatten()
+                .map(|r| r.tag)
+                .as_deref(),
             Some("v0.3.0-rc.1")
         );
         assert_eq!(parse_release_list("[]", REPO, false).ok().flatten(), None);
@@ -581,14 +591,23 @@ mod tests {
         assert_eq!(
             sums,
             [
-                (HASH.to_string(), "engram-0.2.0-x86_64-unknown-linux-gnu".to_string()),
+                (
+                    HASH.to_string(),
+                    "engram-0.2.0-x86_64-unknown-linux-gnu".to_string()
+                ),
                 (HASH.to_string(), "b.zip".to_string())
             ]
         );
         let location = "https://github.com/Perchemop/engram/releases/tag/v0.2.0";
         assert_eq!(tag_from_redirect(location, REPO).as_deref(), Some("v0.2.0"));
-        assert_eq!(tag_from_redirect("https://github.com/Perchemop/engram/releases", REPO), None);
-        assert_eq!(tag_from_redirect("https://evil/Perchemop/engram/releases/tag/v1", REPO), None);
+        assert_eq!(
+            tag_from_redirect("https://github.com/Perchemop/engram/releases", REPO),
+            None
+        );
+        assert_eq!(
+            tag_from_redirect("https://evil/Perchemop/engram/releases/tag/v1", REPO),
+            None
+        );
     }
 
     #[test]
@@ -602,7 +621,10 @@ mod tests {
         );
         let mut release = parse_release(&json, REPO).expect("fixture must parse");
         assert!(release.assets[0].sha256.is_none());
-        assert_eq!(release.sums_asset().map(|a| a.name.as_str()), Some("checksums-sha256.txt"));
+        assert_eq!(
+            release.sums_asset().map(|a| a.name.as_str()),
+            Some("checksums-sha256.txt")
+        );
         release.apply_sums(&[(HASH.to_string(), name.to_string())]);
         assert_eq!(release.assets[0].sha256.as_deref(), Some(HASH));
     }
@@ -618,7 +640,9 @@ mod tests {
 
     #[test]
     fn only_plain_https_links_pass() {
-        assert!(safe_web_link("https://github.com/Perchemop/engram/releases/tag/v1"));
+        assert!(safe_web_link(
+            "https://github.com/Perchemop/engram/releases/tag/v1"
+        ));
         for bad in [
             "http://example.com/",
             "javascript:alert(1)",
