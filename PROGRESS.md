@@ -3,10 +3,34 @@
 Running status of the project. Newest entries at the top. Append per slice;
 never rewrite history.
 
-**Last updated:** 2026-10-24
+**Last updated:** 2026-10-26
 
 ---
-## 2026-10-24 — v0.2.0 slice merged; PR #8 closed; CI required checks green
+## 2026-10-26 — v0.3.0 Anki text import slice merged; PR #12 closed; main CI green
+
+### Merge
+- PR #12 squash-merged to `main` as commit `d1d5fbf`.
+- Contains the v0.3.0 Anki text import domain slice (`src/data/import.rs`, `src/data/export.rs`, `src/data/error.rs`, `src/data/mod.rs`) plus the UI import dialog (`src/ui/import.rs`, `src/ui/app.rs`, `src/ui/mod.rs`) and the release module hardening (`src/update_check.rs`, `src/update_check/release.rs`).
+- Required CI checks green on `main`:
+  - `check (ubuntu-latest)` ✅ (fmt, clippy `-D warnings`, tests, release build)
+  - `build (windows-latest)` ✅
+  - `build (macos-latest)` ✅
+  - `supply-chain` ✅ (gitleaks, cargo-deny licences, CycloneDX SBOM)
+- CodeQL remains red (shallow-clone/fetch issue, not in `.ci-required.txt`).
+- Branch protection on `main` restored with 4 required status checks.
+
+### v0.3.0 Anki text import (domain + UI)
+- Domain: `import_text(path, lib, deck_id, mapping, now)` and `import_text_from_str()` in `src/data/import.rs`; TAB/CSV auto-detection; RFC-4180 quoting; cloze detection (`{{cN::…}}` → Cloze card); duplicate skipping (case-insensitive, trimmed); HTML sanitization (`<br>` → newline, `<b>`/`<i>` stripped); header row skip; deck column with `Parent::Child` on-demand creation; `ImportReport` with `.summary()`.
+- UI: `ImportDialog` with file picker (`rfd`), column mapping controls, first-10-rows preview, cloze/header hints, target deck selector, import result display.
+- Wired into app shell: "Import text…" menu item, Escape handling, dialog close-on-Escape.
+- Example library `assets/examples/sample.engram.json` + `assets/examples/README.md` added; release workflow bundles `sample.engram.json` with every release artifact.
+
+### Next
+- Manual QC walk of `docs/qc/checklist.md` on the v0.3.0 import feature.
+- Tag `v0.3.0` after QC passes.
+- Next slice: FSRS scheduler (`docs/research/fsrs-scheduler.md`, still DRAFT).
+
+---
 
 ### Merge
 - PR #8 `[ci] v0.2.0: queue ordering, deck-local limits, suspend/bury + history, cram sessions` merged to `main` (squash, branch deleted).
