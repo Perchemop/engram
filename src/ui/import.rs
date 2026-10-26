@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use crate::data::{self, import::detect_separator, ImportMapping, ImportReport};
 use crate::data::export::delimited_records;
+use crate::data::{self, import::detect_separator, ImportMapping, ImportReport};
 
 #[derive(Debug, Clone)]
 pub struct ImportDialog {
