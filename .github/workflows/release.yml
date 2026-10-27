@@ -44,7 +44,7 @@ jobs:
         cp "target/${{ matrix.target }}/release/engram${{ matrix.ext }}" \
            "dist/engram-${VERSION}-${{ matrix.target }}${{ matrix.ext }}"
         cp assets/examples/sample.engram.json dist/sample.engram.json
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: release-${{ matrix.target }}
         path: dist/*
