@@ -1,6 +1,6 @@
 # Research note — FSRS scheduler option
 
-**Status:** DRAFT — awaiting human approval (guide §2.3/§8.4).
+**Status:** APPROVED — human approval granted 2026-10-27 (guide §2.3/§8.4).
 **Milestone target:** v0.3.0.
 **Sources (public, capability-level only):**
 - FSRS algorithm description (open-spaced-repetition project):

@@ -26,8 +26,9 @@ pub use library::{
     DEFAULT_DAILY_REVIEWS_LIMIT, SCHEMA_VERSION,
 };
 pub use scheduler::{
-    format_interval, preview_interval, schedule, Grade, LearnPhase, SchedParams, SchedulingState,
-    MAX_EASE, MIN_EASE,
+    format_interval, preview_interval, schedule, scheduler_for, FsrsParams, FsrsScheduler, Grade,
+    LearnPhase, SchedParams, ScheduleParams, Scheduler, SchedulerKind, SchedulingState,
+    Sm2Scheduler, MAX_EASE, MIN_EASE,
 };
 pub use session::{AnsweredCard, SessionSummary, StudySession};
 pub use stats::{DailyCount, DailyDue, LibraryStats};
