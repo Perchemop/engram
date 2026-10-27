@@ -16,7 +16,7 @@ jobs:
     # Actions are pinned to full commit SHAs (guide §20.3); the trailing
     # comment records the release the SHA came from. Dependabot keeps them
     # current (see .github/dependabot.yml).
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: stable
@@ -61,7 +61,7 @@ jobs:
             artifact: engram-linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: stable
@@ -83,7 +83,7 @@ jobs:
   supply-chain:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
     - name: Secret scanning (gitleaks)
@@ -116,7 +116,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         # Diff-informed analysis needs the PR base commit locally: with the
         # default shallow clone CodeQL fails to fetch `main` and produces an
@@ -137,7 +137,7 @@ jobs:
   packaging-plan:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Install cargo-dist (pinned)
       run: |
         curl --proto '=https' --tlsv1.2 -LsSf \
