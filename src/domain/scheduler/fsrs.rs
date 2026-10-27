@@ -216,10 +216,11 @@ fn memory(prev: &SchedulingState, target_retention: f64) -> (f64, f64) {
 
 /// Approximate FSRS state for a card that was scheduled by SM-2.
 ///
-/// SM-2 ease maps linearly onto FSRS difficulty (ease 1.3 → 10, ease 3.0 →
-/// 1) and the current interval maps onto stability through the inverse
-/// forgetting curve, so the card keeps its due date on the first FSRS
-/// review (`docs/research/fsrs-scheduler.md`, "documented approximation").
+/// SM-2 ease maps linearly onto FSRS difficulty: ease 1.3 maps to difficulty
+/// 10, ease 3.0 maps to difficulty 1. The current interval maps onto stability
+/// through the inverse forgetting curve, so the card keeps its due date on the
+/// first FSRS review (`docs/research/fsrs-scheduler.md`, "documented
+/// approximation").
 fn seed_from_sm2(prev: &SchedulingState, target_retention: f64) -> (f64, f64) {
     let ease = if prev.ease.is_finite() {
         prev.ease.clamp(MIN_EASE, MAX_EASE)
