@@ -51,7 +51,7 @@ pub fn show(ui: &mut Ui, app: &mut EngramApp) {
             card.sched.clone(),
         )
     };
-    let params = app.library.settings.sched.clone();
+    let params = app.library.settings.schedule_params();
     let is_cloze = matches!(
         app.library.card(card_id).map(|c| &c.kind),
         Some(crate::domain::CardKind::Cloze { .. })
@@ -156,7 +156,7 @@ fn grade_buttons(
     ui: &mut Ui,
     app: &mut EngramApp,
     sched: &SchedulingState,
-    params: &crate::domain::SchedParams,
+    params: &crate::domain::ScheduleParams,
     now: chrono::DateTime<Utc>,
     t: Theme,
     cram: bool,

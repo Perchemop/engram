@@ -7,7 +7,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use engram::domain::{
     generate_drafts, schedule, Grade, LearnPhase, Library, LibraryError, QueueKind, SchedParams,
-    SchedulingState, Scope,
+    ScheduleParams, SchedulingState, Scope,
 };
 use engram::domain::{CardFilter, CardKind};
 
@@ -36,7 +36,7 @@ fn simulated_study_career_graduates_a_card() {
             now(),
         )
         .unwrap();
-    let params = SchedParams::default();
+    let params = ScheduleParams::from(&SchedParams::default());
     let t = |minutes: i64| now() + chrono::Duration::minutes(minutes);
 
     // New → learning step 0.
@@ -77,7 +77,7 @@ fn lapse_cycle_round_trips_through_relearning() {
             now(),
         )
         .unwrap();
-    let params = SchedParams::default();
+    let params = ScheduleParams::from(&SchedParams::default());
     let base = SchedulingState {
         phase: LearnPhase::Review,
         step: 0,
@@ -86,6 +86,7 @@ fn lapse_cycle_round_trips_through_relearning() {
         due: now(),
         reps: 10,
         lapses: 0,
+        ..SchedulingState::new(now(), 2.5)
     };
     // Apply directly for determinism, then mirror through the library.
     let after_again = schedule(now(), &params, &base, Grade::Again);

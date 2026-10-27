@@ -29,6 +29,11 @@ CycloneDX software bill of materials produced in CI.
 - **SuperMemo-2 (SM-2)** scheduling algorithm — described publicly by
   Piotr Wozniak (1990); Engram implements it from the public description
   with documented extensions (learning steps, ease clamp, easy bonus).
+- **FSRS** scheduling algorithm — described publicly by the
+  open-spaced-repetition project; Engram implements the three-variable
+  model (retrievability, difficulty, stability) from the public algorithm
+  description with the public default weights. No reference-implementation
+  source was copied; see `docs/research/fsrs-scheduler.md`.
 - **`{{cN::…}}` cloze markup** — a long-standing public interchange
   convention for cloze deletions in plain text.
 

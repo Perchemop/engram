@@ -10,7 +10,10 @@ use uuid::Uuid;
 
 use crate::domain::card::{normalise_tags, Card, CardError, CardId, CardKind};
 use crate::domain::deck::{summarise_forest, Deck, DeckColor, DeckError, DeckId, DeckSummary};
-use crate::domain::scheduler::{schedule, Grade, LearnPhase, SchedParams, SchedulingState};
+use crate::domain::scheduler::{
+    schedule, FsrsParams, Grade, LearnPhase, SchedParams, ScheduleParams, SchedulerKind,
+    SchedulingState,
+};
 use crate::domain::session::StudySession;
 
 /// Schema version of the persisted library file.
@@ -40,6 +43,15 @@ pub enum LibraryError {
 #[serde(default)]
 pub struct LibrarySettings {
     pub sched: SchedParams,
+    /// Which scheduler computes review intervals
+    /// (`docs/research/fsrs-scheduler.md`). Defaults to SM-2, so a 0.1.0
+    /// library keeps its exact behaviour.
+    #[serde(default)]
+    pub scheduler_kind: SchedulerKind,
+    /// FSRS tuning; only read when `scheduler_kind` is
+    /// [`SchedulerKind::Fsrs`].
+    #[serde(default)]
+    pub fsrs: FsrsParams,
     pub daily_new_limit: u32,
     pub daily_reviews_limit: u32,
     /// Queue arrangement mode (`docs/research/queue-ordering.md`).
@@ -54,10 +66,28 @@ impl Default for LibrarySettings {
     fn default() -> Self {
         Self {
             sched: SchedParams::default(),
+            scheduler_kind: SchedulerKind::default(),
+            fsrs: FsrsParams::default(),
             daily_new_limit: DEFAULT_DAILY_NEW_LIMIT,
             daily_reviews_limit: DEFAULT_DAILY_REVIEWS_LIMIT,
             queue_order: QueueOrder::DueFirst,
             queue_seed: 0,
+        }
+    }
+}
+
+impl LibrarySettings {
+    /// Scheduler configuration for one review transition.
+    ///
+    /// Session, statistics and UI preview code should build this once and
+    /// pass it to [`schedule`] / [`crate::domain::preview_interval`] so the
+    /// active algorithm is respected without caring which one it is.
+    #[must_use]
+    pub fn schedule_params(&self) -> ScheduleParams {
+        ScheduleParams {
+            kind: self.scheduler_kind,
+            sm2: self.sched.clone(),
+            fsrs: self.fsrs,
         }
     }
 }
@@ -659,7 +689,7 @@ impl Library {
         now: DateTime<Utc>,
         queue_kind: QueueKind,
     ) -> Result<ReviewOutcome, LibraryError> {
-        let params = self.settings.sched.clone();
+        let params = self.settings.schedule_params();
         let card = self
             .card_mut(card_id)
             .ok_or(LibraryError::CardNotFound(card_id))?;
@@ -1792,6 +1822,10 @@ mod tests {
             let obj = card.as_object_mut().unwrap();
             obj.remove("suspended");
             obj.remove("buried_until");
+            let sched = obj.get_mut("sched").and_then(|s| s.as_object_mut()).unwrap();
+            sched.remove("fsrs_difficulty");
+            sched.remove("fsrs_stability");
+            sched.remove("fsrs_retrievability");
         }
         for deck in v["decks"].as_array_mut().unwrap() {
             let obj = deck.as_object_mut().unwrap();
@@ -1801,17 +1835,73 @@ mod tests {
         let settings = v["settings"].as_object_mut().unwrap();
         settings.remove("queue_order");
         settings.remove("queue_seed");
+        settings.remove("scheduler_kind");
+        settings.remove("fsrs");
 
         let restored: Library = serde_json::from_value(v).unwrap();
         let card = restored.card(c).unwrap();
         assert!(!card.suspended);
         assert!(card.buried_until.is_none());
+        assert_eq!(card.sched.fsrs_difficulty, 0.0);
+        assert_eq!(card.sched.fsrs_stability, 0.0);
+        assert_eq!(card.sched.fsrs_retrievability, 0.0);
         assert_eq!(restored.settings.queue_order, QueueOrder::DueFirst);
         assert_eq!(restored.settings.queue_seed, 0);
+        assert_eq!(restored.settings.scheduler_kind, SchedulerKind::Sm2);
+        assert_eq!(restored.settings.fsrs, FsrsParams::default());
         assert_eq!(
             restored.decks[0].new_limit_override, None,
             "missing overrides deserialize to inherit"
         );
+    }
+
+    #[test]
+    fn settings_default_to_sm2_and_default_retention() {
+        let l = lib();
+        assert_eq!(l.settings.scheduler_kind, SchedulerKind::Sm2);
+        assert_eq!(l.settings.fsrs.target_retention, 0.9);
+        let params = l.settings.schedule_params();
+        assert_eq!(params.kind, SchedulerKind::Sm2);
+        assert_eq!(params.sm2, l.settings.sched);
+        assert_eq!(params.fsrs, l.settings.fsrs);
+    }
+
+    #[test]
+    fn fsrs_library_records_fsrs_state() {
+        let mut l = lib();
+        l.settings.scheduler_kind = SchedulerKind::Fsrs;
+        let root = l.decks[0].id;
+        let c = basic(&mut l, root, "fsrs", now());
+        let out = l
+            .record_review(c, Grade::Easy, now(), QueueKind::New)
+            .unwrap();
+        assert_eq!(out.state_after.phase, LearnPhase::Review);
+        assert!(out.state_after.has_fsrs_memory());
+        assert!((out.state_after.interval_days - 13.8206).abs() < 0.01);
+        assert_eq!(out.log.interval_after_days, out.state_after.interval_days);
+        assert_eq!(
+            l.card(c).unwrap().sched,
+            out.state_after,
+            "the reviewed card stores the FSRS state"
+        );
+    }
+
+    #[test]
+    fn fsrs_settings_and_state_roundtrip() {
+        let mut l = lib();
+        l.settings.scheduler_kind = SchedulerKind::Fsrs;
+        l.settings.fsrs.target_retention = 0.85;
+        let root = l.decks[0].id;
+        let c = basic(&mut l, root, "rt", now());
+        l.record_review(c, Grade::Easy, now(), QueueKind::New)
+            .unwrap();
+
+        let json = serde_json::to_string(&l).unwrap();
+        let back: Library = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, l);
+        assert_eq!(back.settings.scheduler_kind, SchedulerKind::Fsrs);
+        assert_eq!(back.settings.fsrs.target_retention, 0.85);
+        assert!(back.card(c).unwrap().sched.has_fsrs_memory());
     }
 
     #[test]
