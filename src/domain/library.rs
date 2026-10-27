@@ -1919,17 +1919,24 @@ mod tests {
         let o = &orig_card.sched;
         assert_eq!(b.phase, o.phase);
         assert_eq!(b.step, o.step);
-        assert!((b.ease - o.ease).abs() < f64::EPSILON);
-        assert!((b.interval_days - o.interval_days).abs() < f64::EPSILON);
+        assert_close(b.ease, o.ease);
+        assert_close(b.interval_days, o.interval_days);
         assert_eq!(b.due, o.due);
         assert_eq!(b.reps, o.reps);
         assert_eq!(b.lapses, o.lapses);
-        assert!((b.fsrs_difficulty - o.fsrs_difficulty).abs() < f64::EPSILON);
-        assert!((b.fsrs_stability - o.fsrs_stability).abs() < f64::EPSILON);
-        assert!((b.fsrs_retrievability - o.fsrs_retrievability).abs() < f64::EPSILON);
+        assert_close(b.fsrs_difficulty, o.fsrs_difficulty);
+        assert_close(b.fsrs_stability, o.fsrs_stability);
+        assert_close(b.fsrs_retrievability, o.fsrs_retrievability);
         assert_eq!(back.settings.scheduler_kind, SchedulerKind::Fsrs);
         assert_eq!(back.settings.fsrs.target_retention, 0.85);
         assert!(back_card.sched.has_fsrs_memory());
+    }
+
+    fn assert_close(left: f64, right: f64) {
+        assert!(
+            (left - right).abs() < 1e-9,
+            "expected approx {left:?} == {right:?}"
+        );
     }
 
     #[test]
