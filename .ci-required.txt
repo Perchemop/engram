@@ -1,6 +1,6 @@
 # Authoritative CI checks (exactly as GitHub reports them).
 # The opencode/ci verification PR treats only these as verdict-deciding.
-check (ubuntu-latest)
-build (windows-latest)
-build (macos-latest)
+check
+build (macos-latest, target/release/engram, engram-macos)
+build (windows-latest, target/release/engram.exe, engram-windows)
 supply-chain
