@@ -10,8 +10,8 @@ use uuid::Uuid;
 use crate::crash_report;
 use crate::data::{self, Prefs};
 use crate::domain::{
-    format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, Scope,
-    StudySession, Theme,
+    format_interval, CardFilter, CardId, DeckColor, Grade, Library, QueueOrder, SchedulerKind,
+    Scope, StudySession, Theme,
 };
 use crate::ui::{decks, editor, generate, import, stats, study, theme};
 use crate::update_check;
@@ -584,6 +584,7 @@ impl EngramApp {
             return;
         }
         dialog.settings.sched = dialog.settings.sched.sanitised();
+        dialog.settings.fsrs = dialog.settings.fsrs.sanitised();
         self.library.settings = dialog.settings;
         self.settings_dialog = None;
         self.dirty = true;
@@ -1403,6 +1404,28 @@ impl EngramApp {
                                 );
                             }
                         });
+                    ui.end_row();
+
+                    ui.label("Scheduler");
+                    egui::ComboBox::from_id_salt("settings_scheduler")
+                        .selected_text(dialog.settings.scheduler_kind.label())
+                        .show_ui(ui, |ui| {
+                            for kind in [SchedulerKind::Sm2, SchedulerKind::Fsrs] {
+                                ui.selectable_value(
+                                    &mut dialog.settings.scheduler_kind,
+                                    kind,
+                                    kind.label(),
+                                );
+                            }
+                        });
+                    ui.end_row();
+
+                    ui.label("FSRS target retention");
+                    ui.add(
+                        egui::Slider::new(&mut dialog.settings.fsrs.target_retention, 0.70..=0.95)
+                            .text("retention")
+                            .step_by(0.01),
+                    );
                     ui.end_row();
 
                     ui.label("Learning steps (minutes)");
