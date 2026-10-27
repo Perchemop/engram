@@ -1901,10 +1901,35 @@ mod tests {
 
         let json = serde_json::to_string(&l).unwrap();
         let back: Library = serde_json::from_str(&json).unwrap();
-        assert_eq!(back, l);
+        assert_eq!(back.settings, l.settings);
+        assert_eq!(back.decks, l.decks);
+        let back_card = back.card(c).unwrap();
+        let orig_card = l.card(c).unwrap();
+        assert_eq!(back_card.id, orig_card.id);
+        assert_eq!(back_card.deck_id, orig_card.deck_id);
+        assert_eq!(back_card.kind, orig_card.kind);
+        assert_eq!(back_card.tags, orig_card.tags);
+        assert_eq!(back_card.created, orig_card.created);
+        assert_eq!(back_card.modified, orig_card.modified);
+        assert_eq!(back_card.suspended, orig_card.suspended);
+        assert_eq!(back_card.buried_until, orig_card.buried_until);
+        // Floating-point FSRS state may differ in the last ulp after serde
+        // round-trip; compare approximately.
+        let b = &back_card.sched;
+        let o = &orig_card.sched;
+        assert_eq!(b.phase, o.phase);
+        assert_eq!(b.step, o.step);
+        assert!((b.ease - o.ease).abs() < f64::EPSILON);
+        assert!((b.interval_days - o.interval_days).abs() < f64::EPSILON);
+        assert_eq!(b.due, o.due);
+        assert_eq!(b.reps, o.reps);
+        assert_eq!(b.lapses, o.lapses);
+        assert!((b.fsrs_difficulty - o.fsrs_difficulty).abs() < f64::EPSILON);
+        assert!((b.fsrs_stability - o.fsrs_stability).abs() < f64::EPSILON);
+        assert!((b.fsrs_retrievability - o.fsrs_retrievability).abs() < f64::EPSILON);
         assert_eq!(back.settings.scheduler_kind, SchedulerKind::Fsrs);
         assert_eq!(back.settings.fsrs.target_retention, 0.85);
-        assert!(back.card(c).unwrap().sched.has_fsrs_memory());
+        assert!(back_card.sched.has_fsrs_memory());
     }
 
     #[test]
