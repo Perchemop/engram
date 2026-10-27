@@ -1,6 +1,23 @@
 # Authoritative CI checks (exactly as GitHub reports them).
-# The opencode/ci verification PR treats only these as verdict-deciding.
-check (ubuntu-latest)
-build (windows-latest)
-build (macos-latest)
+# The verification PR treats only these as verdict-deciding.
+#
+# Matrix jobs report their parameters in the name, so these must match the
+# workflow's matrix exactly — a renamed matrix entry renames the check, and a
+# stale entry here makes every run report FAILURE ("required check did not
+# report") even when everything passed. Update this file whenever ci.yml's
+# matrix or job names change.
+#
+# Current names verified against the check runs on main (sha 7876ca7):
+#   `check` is a single job on ubuntu-latest with no matrix, so it reports
+#   without a parameter; `build` is a matrix job and reports every include key.
+check
+build (windows-latest, target/release/engram.exe, engram-windows)
+build (macos-latest, target/release/engram, engram-macos)
+build (ubuntu-24.04-arm, target/release/engram, engram-linux-arm64)
 supply-chain
+# Deliberately NOT required: `codeql`. It passes on main today, but it failed
+# earlier with "git call failed. Cannot fetch main. Error: fatal: error
+# processing shallow info: 4" plus a pr-diff-range extension error — an
+# infrastructure failure inside the GitHub-managed action, not a finding about
+# this code. It is still reported on every run and stays visible. Add `codeql`
+# above once the action has a stable record here.
