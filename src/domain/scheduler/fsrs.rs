@@ -127,7 +127,10 @@ pub fn next_interval_days(stability: f64, target_retention: f64) -> f64 {
 /// interval and lower retention lengthens it.
 fn interval_factor(target_retention: f64) -> f64 {
     let target = if target_retention.is_finite() {
-        target_retention.clamp(FsrsParams::MIN_TARGET_RETENTION, FsrsParams::MAX_TARGET_RETENTION)
+        target_retention.clamp(
+            FsrsParams::MIN_TARGET_RETENTION,
+            FsrsParams::MAX_TARGET_RETENTION,
+        )
     } else {
         DEFAULT_TARGET_RETENTION
     };
@@ -239,12 +242,7 @@ fn seed_from_sm2(prev: &SchedulingState, target_retention: f64) -> (f64, f64) {
 struct FsrsPolicy;
 
 impl ReviewPolicy for FsrsPolicy {
-    fn graduation(
-        &self,
-        ctx: &PolicyContext<'_>,
-        next: &mut SchedulingState,
-        grade: Grade,
-    ) -> f64 {
+    fn graduation(&self, ctx: &PolicyContext<'_>, next: &mut SchedulingState, grade: Grade) -> f64 {
         let target = ctx.fsrs.target_retention;
         let (difficulty, stability) =
             if next.fsrs_stability > 0.0 && next.fsrs_stability.is_finite() {
@@ -482,7 +480,12 @@ mod tests {
 
     #[test]
     fn relearning_graduates_on_the_post_lapse_stability() {
-        let lapsed = schedule(now(), &params(0.9), &review_state(5.0, 10.0, 10.0), Grade::Again);
+        let lapsed = schedule(
+            now(),
+            &params(0.9),
+            &review_state(5.0, 10.0, 10.0),
+            Grade::Again,
+        );
         let stability = lapsed.fsrs_stability;
         let graduated = schedule(now(), &params(0.9), &lapsed, Grade::Good);
         assert_eq!(graduated.phase, LearnPhase::Review);
@@ -513,7 +516,12 @@ mod tests {
             },
             FsrsParams::default(),
         );
-        let s = schedule(now(), &params, &review_state(5.0, 10_000.0, 10_000.0), Grade::Easy);
+        let s = schedule(
+            now(),
+            &params,
+            &review_state(5.0, 10_000.0, 10_000.0),
+            Grade::Easy,
+        );
         assert_eq!(s.interval_days, 30.0);
     }
 
@@ -534,7 +542,12 @@ mod tests {
 
     #[test]
     fn fsrs_state_serde_roundtrip() {
-        let state = schedule(now(), &params(0.9), &review_state(5.0, 5.0, 5.0), Grade::Good);
+        let state = schedule(
+            now(),
+            &params(0.9),
+            &review_state(5.0, 5.0, 5.0),
+            Grade::Good,
+        );
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("fsrs_stability"));
         let back: SchedulingState = serde_json::from_str(&json).unwrap();

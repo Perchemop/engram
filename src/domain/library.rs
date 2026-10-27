@@ -1822,7 +1822,10 @@ mod tests {
             let obj = card.as_object_mut().unwrap();
             obj.remove("suspended");
             obj.remove("buried_until");
-            let sched = obj.get_mut("sched").and_then(|s| s.as_object_mut()).unwrap();
+            let sched = obj
+                .get_mut("sched")
+                .and_then(|s| s.as_object_mut())
+                .unwrap();
             sched.remove("fsrs_difficulty");
             sched.remove("fsrs_stability");
             sched.remove("fsrs_retrievability");

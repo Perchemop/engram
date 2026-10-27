@@ -146,7 +146,8 @@ impl FsrsParams {
     #[must_use]
     pub fn sanitised(self) -> Self {
         let target_retention = if self.target_retention.is_finite() {
-            self.target_retention.clamp(Self::MIN_TARGET_RETENTION, Self::MAX_TARGET_RETENTION)
+            self.target_retention
+                .clamp(Self::MIN_TARGET_RETENTION, Self::MAX_TARGET_RETENTION)
         } else {
             DEFAULT_TARGET_RETENTION
         };
@@ -441,12 +442,7 @@ struct PolicyContext<'a> {
 trait ReviewPolicy {
     /// Interval (days) granted when a card graduates out of learning or
     /// relearning with `grade`.
-    fn graduation(
-        &self,
-        ctx: &PolicyContext<'_>,
-        next: &mut SchedulingState,
-        grade: Grade,
-    ) -> f64;
+    fn graduation(&self, ctx: &PolicyContext<'_>, next: &mut SchedulingState, grade: Grade) -> f64;
 
     /// Apply a review-phase grade. `prev` is the state before the grade and
     /// `next` an incremental clone of it.
@@ -597,8 +593,7 @@ impl ReviewPolicy for Sm2Policy {
                 s.interval_days = params.graduating_interval_days;
                 s.phase = LearnPhase::Relearning;
                 s.step = 0;
-                s.due =
-                    now + minutes(params.relearn_steps_minutes.first().copied().unwrap_or(10));
+                s.due = now + minutes(params.relearn_steps_minutes.first().copied().unwrap_or(10));
             }
             Grade::Hard => {
                 s.interval_days = cap_interval(
@@ -920,7 +915,10 @@ mod tests {
         let fsrs_preview = preview_interval(now(), &fsrs, &new_state(), Grade::Easy);
         assert_eq!(sm2_preview, "4d");
         assert_ne!(sm2_preview, fsrs_preview);
-        assert_eq!(fsrs_preview, format_interval(fsrs::initial_stability(Grade::Easy)));
+        assert_eq!(
+            fsrs_preview,
+            format_interval(fsrs::initial_stability(Grade::Easy))
+        );
     }
 
     #[test]
@@ -956,8 +954,14 @@ mod tests {
         let nan = FsrsParams {
             target_retention: f64::NAN,
         };
-        assert_eq!(low.sanitised().target_retention, FsrsParams::MIN_TARGET_RETENTION);
-        assert_eq!(high.sanitised().target_retention, FsrsParams::MAX_TARGET_RETENTION);
+        assert_eq!(
+            low.sanitised().target_retention,
+            FsrsParams::MIN_TARGET_RETENTION
+        );
+        assert_eq!(
+            high.sanitised().target_retention,
+            FsrsParams::MAX_TARGET_RETENTION
+        );
         assert_eq!(nan.sanitised().target_retention, 0.9);
         let back: FsrsParams = serde_json::from_str("{}").unwrap();
         assert_eq!(back, FsrsParams::default());
