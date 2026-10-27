@@ -7,6 +7,7 @@ description = "Engram — free, cross-platform spaced repetition & active recall
 license = "MIT"
 readme = "README.md"
 default-run = "engram"
+repository = "https://github.com/Perchemop/engram"
 
 [dependencies]
 eframe = "0.36"

@@ -1,0 +1,57 @@
+# Mutation testing (guide §9): cargo-mutants injects small faults into the
+# source and fails when the test suite still passes — evidence that the
+# assertions actually bite, which coverage alone cannot show.
+#
+# Weekly rather than per pull request: a full run is hours of CI, and the
+# value is a trend, not a gate on an individual change. The scheduler and the
+# session state machine are mutated first because a silently weak test there
+# ships wrong review intervals to every user.
+name: Mutation tests
+
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutants-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: taiki-e/install-action@c1952a69c392b2c5f2eaa845b56120fff5fe49d3 # v2.48.5
+        with:
+          tool: cargo-mutants
+
+      # Cheap sanity check: a wrong path fails here in seconds instead of after
+      # an hour of mutation runs.
+      - name: List the mutants in scope
+        run: |
+          cargo mutants --list \
+            --file src/domain/scheduler.rs \
+            --file src/domain/session.rs
+
+      - name: Mutate the scheduler and the session state machine
+        run: |
+          cargo mutants \
+            --file src/domain/scheduler.rs \
+            --file src/domain/session.rs \
+            --timeout 300 -j 2
+
+      - name: Upload the mutant report
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: mutants-report
+          path: mutants.out
+          if-no-files-found: warn
+          retention-days: 30
