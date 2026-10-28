@@ -1,0 +1,26 @@
+name: Personal data scan
+
+# Guide II.29 (owner directive 2026-10-27): personal data and secrets must
+# never be committed or released. This job fails when a real-looking home
+# path or email address is present in tracked files, so a leak cannot merge.
+# Secret scanning (gitleaks) runs in ci.yml's supply-chain job.
+#
+# The whole-history scan and the release-artefact scan are release-time
+# duties (guide II.29.2 and II.29.6) and are run before any release is cut.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  personal-data:
+    name: Personal data scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Scan tracked files for personal data
+        run: bash scripts/scan-personal-data.sh

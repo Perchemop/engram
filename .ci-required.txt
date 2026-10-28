@@ -4,3 +4,6 @@ check
 build (macos-latest, target/release/engram, engram-macos)
 build (windows-latest, target/release/engram.exe, engram-windows)
 supply-chain
+
+# Personal data scan (pii.yml)
+Personal data scan
