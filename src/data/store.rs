@@ -98,6 +98,30 @@ pub fn load_library(path: &std::path::Path) -> Result<Option<Library>, DataError
     Ok(Some(serde_json::from_str(&text)?))
 }
 
+/// Move a library file that failed to load aside, preserving the user's
+/// bytes, so an autosave can never overwrite them with a fresh empty
+/// library (audit finding `data-loss-corrupt-load-overwrite`).
+///
+/// The quarantined copy keeps its original name plus a
+/// `.corrupt-<unix-seconds>` suffix; a `quarantined` marker file is not
+/// needed because the suffix is the record. Idempotent under repeated
+/// failures only in the sense that each failure renames the file that
+/// currently sits at `path`.
+///
+/// # Errors
+/// [`DataError`] when the rename fails — the caller must then refuse to
+/// save to that path for the rest of the session.
+pub fn quarantine_corrupt_file(path: &std::path::Path) -> Result<std::path::PathBuf, DataError> {
+    let stamped = format!(
+        "{}.corrupt-{}",
+        path.to_string_lossy(),
+        chrono::Utc::now().timestamp()
+    );
+    let target = std::path::PathBuf::from(&stamped);
+    fs::rename(path, &target)?;
+    Ok(target)
+}
+
 /// Save the app preferences.
 ///
 /// # Errors
@@ -162,5 +186,45 @@ mod tests {
         let path =
             std::env::temp_dir().join(format!("missing_{}.engram.json", uuid::Uuid::new_v4()));
         assert!(load_library(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn quarantine_moves_the_failed_file_aside_and_preserves_bytes() {
+        let dir = std::env::temp_dir().join(format!("engram_q_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.engram.json");
+        std::fs::write(&path, "{ not json").unwrap();
+
+        let quarantined = quarantine_corrupt_file(&path).unwrap();
+        assert!(!path.exists(), "original path must be vacated");
+        assert!(quarantined.exists());
+        let preserved = std::fs::read_to_string(&quarantined).unwrap();
+        assert_eq!(preserved, "{ not json");
+        assert!(
+            quarantined.to_string_lossy().contains(".corrupt-"),
+            "quarantine name must carry the corrupt marker"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn quarantined_file_no_longer_loads_at_the_original_path() {
+        // The full chain the audit flagged: corrupt file at the default path,
+        // quarantine, then a fresh library may save to that path safely.
+        let dir = std::env::temp_dir().join(format!("engram_q2_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.engram.json");
+        std::fs::write(&path, "[]").unwrap();
+        assert!(load_library(&path).is_err());
+
+        quarantine_corrupt_file(&path).unwrap();
+        let fresh = Library::new("My Engram", chrono::Utc::now());
+        save_library(&fresh, &path).unwrap();
+        let reloaded = load_library(&path).unwrap().unwrap();
+        assert_eq!(reloaded.name, "My Engram");
+        // The user's original bytes survive under the quarantine name.
+        let entries: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
+        assert_eq!(entries.len(), 2, "corrupt backup + fresh library");
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

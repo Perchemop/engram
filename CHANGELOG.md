@@ -33,6 +33,23 @@ First functional test build. Scope is deliberately limited (see
 - No sync, accounts, mobile or web target (out of scope for this release).
 - Full list: `docs/known-limitations.md`.
 
+## [0.3.1] - 2026-10-28
+
+Data-safety fix release from the end-to-end security audit
+(security-audit run engram-run-1).
+
+### Fixed
+- **A corrupt library file can no longer be overwritten with an empty
+  library.** A file that fails to load is quarantined beside its original
+  location (`…engram.json.corrupt-<timestamp>`) and the session starts on a
+  fresh file; if the quarantine itself fails, saving is disabled for the
+  session instead (audit: data-loss-corrupt-load-overwrite, high).
+- **Deck explosion no longer freezes the app.** Deck summaries now aggregate
+  in O(C + D) per frame instead of O(D³ + C·D²), deck descendants resolve
+  via a children map, and text imports cap deck creation at 500 new decks
+  and 5 `::` levels per path — capped rows are counted and skipped, never
+  fatal (audit: deck-explosion-frame-freeze, high).
+
 ## [0.3.0] - 2026-10-27
 
 Data & interoperability milestone.
