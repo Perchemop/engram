@@ -1629,7 +1629,7 @@ mod tests {
         let mut chain = Vec::new();
         for i in 0..2_000 {
             let d = l
-                .new_deck(Some(parent), format!("d{i}"), None, now())
+                .new_deck(Some(parent), &format!("d{i}"), None, now())
                 .unwrap();
             chain.push(d);
             parent = d;

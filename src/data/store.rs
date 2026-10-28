@@ -223,7 +223,7 @@ mod tests {
         let reloaded = load_library(&path).unwrap().unwrap();
         assert_eq!(reloaded.name, "My Engram");
         // The user's original bytes survive under the quarantine name.
-        let entries: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
+        let entries: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
         assert_eq!(entries.len(), 2, "corrupt backup + fresh library");
         std::fs::remove_dir_all(&dir).ok();
     }
