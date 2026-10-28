@@ -33,6 +33,45 @@ First functional test build. Scope is deliberately limited (see
 - No sync, accounts, mobile or web target (out of scope for this release).
 - Full list: `docs/known-limitations.md`.
 
+## [0.3.0] - 2026-10-27
+
+Data & interoperability milestone.
+
+### Added
+- Anki-style text import (File → Import text): TAB/CSV auto-detection,
+  RFC-4180 quoting, column mapping with a ten-row preview, cloze detection,
+  case-insensitive duplicate skipping, HTML sanitisation, and `Parent::Child`
+  deck columns created on demand.
+- Pluggable scheduler: Settings → Scheduler offers **SM-2** (default,
+  unchanged) and **FSRS** (three-variable model with the public default
+  weights), with a target-retention slider (0.70–0.95). Learning steps and
+  lapse handling are shared; only graduated intervals differ.
+- Example library ships with every release
+  (`sample.engram.json`) — decks, Basic + Cloze cards, suspended and buried
+  cards, all three phases, ready to open via File → Open Library.
+
+### Changed
+- Release pipeline verifies SHA-256 digests and picks per-platform assets
+  before offering an update.
+
+### Fixed
+- The in-app version string now matches the release tag (0.2.0 and 0.3.0
+  binaries reported 0.1.0).
+
+## [0.2.0] - 2026-10-24
+
+Richer study workflow (research notes approved per guide §2.3/§8.4).
+
+### Added
+- Queue ordering: Due first / Interleaved / daily-seeded Shuffle
+  (Settings → Queue order).
+- Deck-local daily-limit overrides, resolved up the deck tree.
+- Card history browser and per-card suspend / bury controls.
+- Cram sessions that ignore due dates and daily limits.
+- Open-source readiness: Code of Conduct, Security policy, Accessibility
+  statement, Governance, issue templates, supply-chain CI (gitleaks, CodeQL,
+  cargo-deny, SBOM) and Dependabot.
+
 ## [Unreleased]
 
 ### Fixed
