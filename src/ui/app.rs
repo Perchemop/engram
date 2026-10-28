@@ -149,7 +149,12 @@ impl EngramApp {
                             true,
                         ),
                     };
-                    (Library::new("My Engram", Utc::now()), None, status, load_failed)
+                    (
+                        Library::new("My Engram", Utc::now()),
+                        None,
+                        status,
+                        load_failed,
+                    )
                 }
             },
             None => (
