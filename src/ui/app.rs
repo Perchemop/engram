@@ -50,6 +50,10 @@ pub struct EngramApp {
     pub(crate) status: String,
     pub(crate) dirty: bool,
     title_dirty: bool,
+    /// Set when the default library failed to load AND could not be
+    /// quarantined: saving stays disabled so the autosave can never overwrite
+    /// the user's bytes (audit finding data-loss-corrupt-load-overwrite).
+    pub(crate) load_failed: bool,
 
     // Decks page state.
     pub(crate) selected_deck: Option<Uuid>,
@@ -113,24 +117,46 @@ impl EngramApp {
             });
         }
 
-        let (library, path, status) = match data::default_library_path() {
+        let (library, path, status, load_failed) = match data::default_library_path() {
             Some(p) => match data::load_library(&p) {
-                Ok(Some(lib)) => (lib, Some(p), "Library loaded".to_string()),
+                Ok(Some(lib)) => (lib, Some(p), "Library loaded".to_string(), false),
                 Ok(None) => (
                     Library::new("My Engram", Utc::now()),
                     Some(p),
                     "New library created".to_string(),
+                    false,
                 ),
-                Err(e) => (
-                    Library::new("My Engram", Utc::now()),
-                    None,
-                    format!("Library failed to load ({e}); started a new one"),
-                ),
+                Err(e) => {
+                    // Audit finding data-loss-corrupt-load-overwrite: without
+                    // this, the fresh empty library would autosave over the
+                    // user's bytes on the first mutation. Quarantine the
+                    // failed file; only if the quarantine itself fails do we
+                    // disable saving for the session.
+                    let (status, load_failed) = match data::quarantine_corrupt_file(&p) {
+                        Ok(quarantined) => (
+                            format!(
+                                "Library failed to load ({e}); kept a backup at {} and \
+                                 started a new one",
+                                quarantined.to_string_lossy()
+                            ),
+                            false,
+                        ),
+                        Err(_) => (
+                            format!(
+                                "Library failed to load ({e}); could not move it aside - \
+                                 saving is disabled until you move or delete it"
+                            ),
+                            true,
+                        ),
+                    };
+                    (Library::new("My Engram", Utc::now()), None, status, load_failed)
+                }
             },
             None => (
                 Library::new("My Engram", Utc::now()),
                 None,
                 "No data directory available; library is not persisted yet".to_string(),
+                false,
             ),
         };
 
@@ -142,6 +168,7 @@ impl EngramApp {
             status,
             dirty: false,
             title_dirty: true,
+            load_failed,
             selected_deck: None,
             filter: CardFilter::default(),
             selected_cards: Vec::new(),
@@ -170,6 +197,11 @@ impl EngramApp {
     // ------------------------------------------------------------------
 
     fn resolve_save_path(&self) -> Option<PathBuf> {
+        if self.load_failed {
+            // The failed file could not be moved aside; autosaving over it is
+            // exactly the data-loss chain the audit confirmed.
+            return None;
+        }
         self.path.clone().or_else(data::default_library_path)
     }
 
@@ -241,6 +273,7 @@ impl EngramApp {
             match data::save_library(&self.library, &path) {
                 Ok(()) => {
                     self.path = Some(path);
+                    self.load_failed = false;
                     self.dirty = false;
                     self.status = "Saved".to_string();
                     self.title_dirty = true;
@@ -259,6 +292,7 @@ impl EngramApp {
                 Ok(Some(lib)) => {
                     self.library = lib;
                     self.path = Some(path);
+                    self.load_failed = false;
                     self.close_all_dialogs();
                     self.session = None;
                     self.selected_deck = None;

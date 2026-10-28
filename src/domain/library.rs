@@ -309,17 +309,25 @@ impl Library {
 
     /// The deck plus every descendant id. Guarded against corrupted parent
     /// cycles (e.g. a hand-edited file): every id is pushed at most once.
+    ///
+    /// O(D + output) via one children map, not a full deck scan per node
+    /// (audit finding deck-explosion-frame-freeze).
     #[must_use]
     pub fn descendant_ids(&self, id: DeckId) -> Vec<DeckId> {
+        let mut children: HashMap<DeckId, Vec<DeckId>> = HashMap::new();
+        for d in &self.decks {
+            if let Some(p) = d.parent {
+                children.entry(p).or_default().push(d.id);
+            }
+        }
         let mut out = vec![id];
         let mut seen: std::collections::HashSet<DeckId> = std::collections::HashSet::new();
         seen.insert(id);
         let mut i = 0;
         while i < out.len() {
-            let parent = out[i];
-            for d in &self.decks {
-                if d.parent == Some(parent) && seen.insert(d.id) {
-                    out.push(d.id);
+            for child in children.get(&out[i]).cloned().unwrap_or_default() {
+                if seen.insert(child) {
+                    out.push(child);
                 }
             }
             i += 1;
@@ -348,7 +356,8 @@ impl Library {
         match scope {
             Scope::All => self.cards.iter().collect(),
             Scope::Deck(id) => {
-                let ids = self.descendant_ids(id);
+                let ids: std::collections::HashSet<DeckId> =
+                    self.descendant_ids(id).into_iter().collect();
                 self.cards
                     .iter()
                     .filter(|c| ids.contains(&c.deck_id))
@@ -748,30 +757,83 @@ impl Library {
     }
 
     /// Flattened deck tree with card and due counts for the given scope.
+    ///
+    /// One pass over the cards for direct per-deck counts, then one
+    /// reverse-topological aggregation over the deck tree: O(C + D) per call
+    /// (audit finding deck-explosion-frame-freeze; the previous
+    /// implementation was O(D³ + C·D²) and ran every frame). Corrupted
+    /// parent cycles terminate: a deck inside a cycle finalises with the
+    /// counts reachable before the cycle edge is skipped.
     #[must_use]
     pub fn deck_summaries(&self, now: DateTime<Utc>) -> Vec<DeckSummary> {
-        // Aggregate counts up the tree so a parent shows its subtree totals.
-        let mut counts: HashMap<DeckId, (usize, usize)> = HashMap::new();
-        let direct: HashMap<DeckId, DueCounts> = self
-            .decks
-            .iter()
-            .map(|d| (d.id, self.due_counts(Scope::Deck(d.id), now)))
-            .collect();
-        for d in &self.decks {
-            let scope_ids = self.descendant_ids(d.id);
-            let card_count = self
-                .cards
-                .iter()
-                .filter(|c| scope_ids.contains(&c.deck_id))
-                .count();
-            let due = scope_ids
-                .iter()
-                .filter_map(|id| direct.get(id))
-                .map(|dc| dc.learning + dc.review)
-                .sum::<usize>();
-            counts.insert(d.id, (card_count, due));
+        // Direct per-deck counts: one pass over the cards. "Due" counts the
+        // same card set the old per-scope due_counts did (learning,
+        // relearning and review cards whose due time has passed; new cards
+        // and blocked cards excluded).
+        let mut direct_cards: HashMap<DeckId, usize> = HashMap::new();
+        let mut direct_due: HashMap<DeckId, usize> = HashMap::new();
+        for c in &self.cards {
+            *direct_cards.entry(c.deck_id).or_insert(0) += 1;
+            if !c.is_blocked(now) {
+                let due = match c.sched.phase {
+                    LearnPhase::New => false,
+                    LearnPhase::Learning | LearnPhase::Relearning | LearnPhase::Review => {
+                        c.sched.due <= now
+                    }
+                };
+                if due {
+                    *direct_due.entry(c.deck_id).or_insert(0) += 1;
+                }
+            }
         }
-        summarise_forest(&self.decks, &counts)
+
+        // Children lists for the aggregation walks.
+        let mut children: HashMap<DeckId, Vec<DeckId>> = HashMap::new();
+        for d in &self.decks {
+            if let Some(p) = d.parent {
+                children.entry(p).or_default().push(d.id);
+            }
+        }
+
+        // Post-order over every deck (children finalise before parents),
+        // guarded against corrupted parent cycles by the in-progress mark.
+        let mut totals: HashMap<DeckId, (usize, usize)> = HashMap::new();
+        let mut state: HashMap<DeckId, u8> = HashMap::new(); // 1 = open, 2 = done
+        for start in self.decks.iter().map(|d| d.id) {
+            if state.contains_key(&start) {
+                continue;
+            }
+            let mut stack: Vec<(DeckId, usize)> = vec![(start, 0)];
+            state.insert(start, 1);
+            while let Some((id, idx)) = stack.last().copied() {
+                let kids = children.get(&id).cloned().unwrap_or_default();
+                if idx < kids.len() {
+                    let child = kids[idx];
+                    stack.last_mut().expect("non-empty").1 += 1;
+                    match state.get(&child) {
+                        None => {
+                            state.insert(child, 1);
+                            stack.push((child, 0));
+                        }
+                        Some(1) => {} // cycle edge: skip, do not recurse
+                        Some(_) => {} // already finalised
+                    }
+                } else {
+                    stack.pop();
+                    let mut cards = direct_cards.get(&id).copied().unwrap_or(0);
+                    let mut due = direct_due.get(&id).copied().unwrap_or(0);
+                    for child in &kids {
+                        if let Some(&(cc, cd)) = totals.get(child) {
+                            cards += cc;
+                            due += cd;
+                        }
+                    }
+                    totals.insert(id, (cards, due));
+                    state.insert(id, 2);
+                }
+            }
+        }
+        summarise_forest(&self.decks, &totals)
     }
 
     // ------------------------------------------------------------------
@@ -1553,6 +1615,55 @@ mod tests {
         // The library is still repairable: re-parent the cycle away.
         assert!(l.move_deck(a, Some(root)).is_ok());
         assert_eq!(l.deck(a).unwrap().parent, Some(root));
+    }
+
+    #[test]
+    fn deck_summaries_aggregate_a_wide_deep_tree_in_linear_work() {
+        // Regression for audit finding deck-explosion-frame-freeze: the old
+        // implementation was O(D^3) per call and froze the UI on a ~1k-deck
+        // library. A 2,000-deck chain must aggregate correctly — and quickly,
+        // since this test runs in CI.
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let mut parent = root;
+        let mut chain = Vec::new();
+        for i in 0..2_000 {
+            let d = l
+                .new_deck(Some(parent), format!("d{i}"), None, now())
+                .unwrap();
+            chain.push(d);
+            parent = d;
+        }
+        // One due review card at the leaf.
+        let leaf = *chain.last().expect("non-empty chain");
+        let card = basic(&mut l, leaf, "leaf", now());
+        make_review(&mut l, card, 1, now());
+
+        let summaries = l.deck_summaries(now());
+        let root_summary = summaries.iter().find(|s| s.id == root).unwrap();
+        assert_eq!(root_summary.card_count, 1, "leaf card aggregates to root");
+        assert_eq!(root_summary.due_count, 1);
+        let leaf_summary = summaries.iter().find(|s| s.id == leaf).unwrap();
+        assert_eq!(leaf_summary.card_count, 1);
+        assert_eq!(leaf_summary.due_count, 1);
+        let mid = summaries.iter().find(|s| s.id == chain[1_000]).unwrap();
+        assert_eq!(mid.card_count, 1, "mid-chain deck sees the leaf card");
+    }
+
+    #[test]
+    fn deck_summaries_terminate_on_corrupted_cycles() {
+        // A two-deck cycle plus the root: the aggregation must terminate and
+        // not double-count or panic.
+        let mut l = lib();
+        let root = l.decks[0].id;
+        let a = l.new_deck(Some(root), "A", None, now()).unwrap();
+        let b = l.new_deck(Some(a), "B", None, now()).unwrap();
+        l.decks.iter_mut().find(|d| d.id == a).unwrap().parent = Some(b);
+        basic(&mut l, b, "cycle card", now());
+        // Must terminate; cycle-bound decks are simply absent from the
+        // forest display (same behaviour as before the rewrite).
+        let summaries = l.deck_summaries(now());
+        assert!(summaries.iter().all(|s| s.card_count <= 1));
     }
 
     /// Add a basic card with a one-word back to `deck`; keeps test setup

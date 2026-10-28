@@ -26,6 +26,14 @@ use crate::domain::library::Library;
 /// Error message used when the import file is not valid UTF-8 text.
 const NOT_UTF8: &str = "file is not UTF-8 text";
 
+/// Upper bound on decks a single text import may create (audit finding
+/// deck-explosion-frame-freeze: uncapped creation made the app durably
+/// unusable via the per-frame deck summaries).
+pub const MAX_IMPORT_DECKS: usize = 500;
+
+/// Upper bound on `Parent::Child` levels per imported deck path.
+pub const MAX_IMPORT_DECK_DEPTH: usize = 5;
+
 /// Which columns of the imported file map to which card field.
 ///
 /// The default matches Engram's own layout: `front`, `back`, `tags`, in
@@ -128,6 +136,10 @@ pub fn import_text_from_str(
     let records = delimited_records(text, separator);
     let mut report = ImportReport::default();
     let mut first_content = true;
+    // Decks created by this import, for the per-import cap (audit finding
+    // deck-explosion-frame-freeze: uncapped deck creation made the app
+    // durably unusable).
+    let mut created_decks = 0usize;
 
     for fields in &records {
         if fields.iter().all(|f| f.trim().is_empty()) {
@@ -171,7 +183,17 @@ pub fn import_text_from_str(
         }
 
         let target = match deck_spec {
-            Some(spec) => resolve_deck_path(lib, spec, now)?,
+            Some(spec) => match resolve_deck_path(lib, spec, now, &mut created_decks) {
+                Ok(id) => id,
+                // Deck creation failed (cap reached, depth cap, sibling-name
+                // conflict): the row is counted and skipped, never fatal —
+                // matching the module's documented invariant. The deck-DoS
+                // caps are audit finding deck-explosion-frame-freeze.
+                Err(_) => {
+                    report.skipped_invalid += 1;
+                    continue;
+                }
+            },
             None => deck_id,
         };
         let kind = build_kind(front, back);
@@ -333,13 +355,25 @@ fn find_deck_path(lib: &Library, spec: &str) -> Option<DeckId> {
 
 /// Resolve a `Parent::Child` deck path, creating missing decks on demand
 /// with the same sibling-name uniqueness rules as manual creation.
+///
+/// Capped against deck-explosion DoS (audit finding
+/// deck-explosion-frame-freeze): at most [`MAX_IMPORT_DECKS`] new decks per
+/// import and at most [`MAX_IMPORT_DECK_DEPTH`] `::` levels per path. The
+/// caller counts a capped row as skipped, never fatal.
 fn resolve_deck_path(
     lib: &mut Library,
     spec: &str,
     now: DateTime<Utc>,
+    created: &mut usize,
 ) -> Result<DeckId, DataError> {
+    let segments = deck_segments(spec);
+    if segments.len() > MAX_IMPORT_DECK_DEPTH {
+        return Err(DataError::Csv(format!(
+            "deck path deeper than {MAX_IMPORT_DECK_DEPTH} levels"
+        )));
+    }
     let mut parent: Option<DeckId> = None;
-    for segment in deck_segments(spec) {
+    for segment in segments {
         let existing = lib
             .decks
             .iter()
@@ -347,7 +381,15 @@ fn resolve_deck_path(
             .map(|d| d.id);
         let id = match existing {
             Some(id) => id,
-            None => lib.new_deck(parent, segment, None, now)?,
+            None => {
+                if *created >= MAX_IMPORT_DECKS {
+                    return Err(DataError::Csv(format!(
+                        "import would create more than {MAX_IMPORT_DECKS} decks"
+                    )));
+                }
+                *created += 1;
+                lib.new_deck(parent, segment, None, now)?
+            }
         };
         parent = Some(id);
     }
@@ -662,5 +704,44 @@ mod tests {
         assert_eq!(detect_separator("a,b\n"), ',');
         assert_eq!(detect_separator("\na\tb\n"), '\t');
         assert_eq!(detect_separator(""), ',');
+    }
+
+    #[test]
+    fn deck_paths_deeper_than_the_cap_are_skipped() {
+        // Audit finding deck-explosion-frame-freeze: depth cap.
+        let (mut lib, deck) = library();
+        let spec = ["L1", "L2", "L3", "L4", "L5", "L6"].join("::");
+        let mapping = ImportMapping {
+            front: 0,
+            back: 1,
+            tags: None,
+            deck: Some(2),
+        };
+        let text = format!("q1\tb1\t{spec}\n");
+        let report = run(&text, &mut lib, deck, &mapping);
+        assert_eq!(report.imported, 0);
+        assert_eq!(report.skipped_invalid, 1);
+        assert_eq!(lib.decks.len(), 1, "no decks created beyond the cap");
+    }
+
+    #[test]
+    fn deck_creation_is_capped_per_import() {
+        // Audit finding deck-explosion-frame-freeze: count cap.
+        let (mut lib, deck) = library();
+        let mapping = ImportMapping {
+            front: 0,
+            back: 1,
+            tags: None,
+            deck: Some(2),
+        };
+        let mut text = String::new();
+        let rows = MAX_IMPORT_DECKS + 5;
+        for i in 0..rows {
+            text.push_str(&format!("card{i}\tx\tD{i}\n"));
+        }
+        let report = run(&text, &mut lib, deck, &mapping);
+        assert_eq!(lib.decks.len(), 1 + MAX_IMPORT_DECKS);
+        assert_eq!(report.imported, MAX_IMPORT_DECKS);
+        assert_eq!(report.skipped_invalid, 5);
     }
 }
