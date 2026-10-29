@@ -129,7 +129,7 @@ pub fn import_csv(
     lib: &mut Library,
     deck_id: DeckId,
     now: DateTime<Utc>,
-) -> Result<usize, DataError> {
+) -> Result<(usize, usize), DataError> {
     let text = fs::read_to_string(path)?;
     // Duplicate rule shared with the text importer (audit finding
     // csv-import-no-dedup): re-importing an export must not duplicate the

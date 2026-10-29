@@ -14,7 +14,12 @@ all-features = true
 # v2 schema: known vulnerabilities and yanked crates fail the supply-chain
 # job; unmaintained crates surface as advisory notes for the owner to
 # triage. Ignore specific advisory IDs here only with a recorded reason.
-ignore = []
+ignore = [
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained; transitive via egui/epaint" },
+    { id = "RUSTSEC-2026-0370", reason = "zbus_names unmaintained; transitive via arboard (Linux clipboard)" },
+    { id = "RUSTSEC-2026-0371", reason = "zvariant unmaintained; transitive via arboard (Linux clipboard)" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive unmaintained; transitive via arboard (Linux clipboard)" },
+]
 
 [licenses]
 # Require a confident match before accepting a detected licence.
