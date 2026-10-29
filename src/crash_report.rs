@@ -146,10 +146,9 @@ fn to_report(text: &str) -> CrashReport {
     let cut = if body.is_char_boundary(16_000) {
         16_000
     } else {
-        body[..16_000]
-            .char_indices()
-            .map(|(i, _)| i)
-            .last()
+        (0..=16_000)
+            .rev()
+            .find(|&i| body.is_char_boundary(i))
             .unwrap_or(0)
     };
     body.truncate(cut);
