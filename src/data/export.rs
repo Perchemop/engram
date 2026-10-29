@@ -346,7 +346,8 @@ mod tests {
             now(),
         )
         .unwrap();
-        let path = std::env::temp_dir().join(format!("engram_formula_{}.csv", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir()
+            .join(format!("engram_formula_{}.csv", uuid::Uuid::new_v4()));
         export_csv(&path, &lib, Scope::All).unwrap();
         let exported = fs::read_to_string(&path).unwrap();
         assert!(exported.contains("'=cmd"), "front must be neutralised");

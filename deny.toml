@@ -10,13 +10,11 @@
 all-features = true
 
 [advisories]
-# RustSec gate (audit finding dependency-pinning-advisories-gap): a known
-# vulnerability in any dependency fails the supply-chain job. Yanked and
-# unmaintained crates warn so the owner can plan replacement without
-# blocking a release on third-party bookkeeping.
-vulnerability = "deny"
-unmaintained = "warn"
-yanked = "warn"
+# RustSec gate (audit finding dependency-pinning-advisories-gap). cargo-deny
+# v2 schema: known vulnerabilities and yanked crates fail the supply-chain
+# job; unmaintained crates surface as advisory notes for the owner to
+# triage. Ignore specific advisory IDs here only with a recorded reason.
+ignore = []
 
 [licenses]
 # Require a confident match before accepting a detected licence.
