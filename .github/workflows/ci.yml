@@ -100,7 +100,11 @@ jobs:
         toolchain: stable
     - uses: taiki-e/install-action@c1952a69c392b2c5f2eaa845b56120fff5fe49d3 # v2.48.5
       with:
-        tool: cargo-deny,cargo-cyclonedx
+        # Explicit pin: the action's `latest` resolves to cargo-deny 0.16.4,
+        # whose bundled rustsec crate cannot parse the current advisory DB
+        # (CVSS 4.0 frontmatter; EmbarkStudios/cargo-deny#804). 0.19.9 has
+        # rustsec 0.31+ and the v2 deny.toml schema.
+        tool: cargo-deny@0.19.9,cargo-cyclonedx
     - name: Dependency licences and advisories (cargo-deny)
       run: cargo deny check licenses sources advisories
     - name: Software Bill of Materials (CycloneDX)
