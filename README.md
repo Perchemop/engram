@@ -44,8 +44,9 @@ To build from source instead, see [Build](#build) below.
 Windows, macOS and Linux desktop builds are produced and tested in CI —
 every CI run attaches ready-to-run binaries as artefacts
 (`engram-linux`, `engram-linux-arm64`, `engram-windows`, `engram-macos`).
-Tagged releases (`v*.*.*`) additionally publish signed-checksum binaries on
-the [Releases page](https://github.com/Perchemop/engram/releases/latest).
+Tagged releases (`v*.*.*`) additionally publish binaries with SHA-256
+checksums (`checksums-sha256.txt`) on the
+[Releases page](https://github.com/Perchemop/engram/releases/latest).
 The scheduler, domain and data layers are pure Rust and platform-independent.
 
 ## Privacy

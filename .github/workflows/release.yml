@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     strategy:
@@ -27,15 +31,19 @@ jobs:
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
+    # Actions are pinned to full commit SHAs (guide §20.3, audit finding
+    # release-workflow-mutable-actions); the trailing comment records the
+    # release the SHA came from. Dependabot keeps them current.
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
+        toolchain: stable
         targets: ${{ matrix.target }}
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
     - name: Tests
-      run: cargo test --all --target ${{ matrix.target }}
+      run: cargo test --all --locked --target ${{ matrix.target }}
     - name: Build release
-      run: cargo build --release --target ${{ matrix.target }}
+      run: cargo build --release --locked --target ${{ matrix.target }}
     - name: Package
       shell: bash
       run: |
@@ -44,7 +52,7 @@ jobs:
         cp "target/${{ matrix.target }}/release/engram${{ matrix.ext }}" \
            "dist/engram-${VERSION}-${{ matrix.target }}${{ matrix.ext }}"
         cp assets/examples/sample.engram.json dist/sample.engram.json
-    - uses: actions/upload-artifact@v7
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
         name: release-${{ matrix.target }}
         path: dist/*
@@ -55,8 +63,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         pattern: release-*
         path: dist
@@ -65,6 +73,8 @@ jobs:
       run: |
         cd dist
         sha256sum * > checksums-sha256.txt
+    - name: Personal-data scan of release artefacts (guide II.29)
+      run: bash scripts/scan-personal-data.sh --path dist
     - name: Extract release notes from CHANGELOG
       run: |
         VERSION="${GITHUB_REF_NAME#v}"

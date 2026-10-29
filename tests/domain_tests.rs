@@ -224,14 +224,23 @@ fn csv_roundtrip_between_libraries() {
 
     let mut target = Library::new("Target", now());
     let tdeck = target.decks[0].id;
-    let imported = engram::data::import_csv(&path, &mut target, tdeck, now()).unwrap();
+    let (imported, skipped) = engram::data::import_csv(&path, &mut target, tdeck, now()).unwrap();
     assert_eq!(imported, 2);
+    assert_eq!(skipped, 0);
     assert_eq!(target.cards.len(), 2);
     assert!(target
         .cards
         .iter()
         .any(|c| matches!(c.kind, CardKind::Cloze { .. })));
     assert!(target.cards.iter().any(|c| c.tags.contains(&"math".into())));
+
+    // Re-importing the same file must not duplicate the library (audit
+    // finding csv-import-no-dedup).
+    let (reimported, re_skipped) =
+        engram::data::import_csv(&path, &mut target, tdeck, now()).unwrap();
+    assert_eq!(reimported, 0);
+    assert_eq!(re_skipped, 2);
+    assert_eq!(target.cards.len(), 2);
     std::fs::remove_dir_all(&dir).ok();
 }
 

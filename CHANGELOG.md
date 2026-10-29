@@ -33,6 +33,41 @@ First functional test build. Scope is deliberately limited (see
 - No sync, accounts, mobile or web target (out of scope for this release).
 - Full list: `docs/known-limitations.md`.
 
+## [0.3.2] - 2026-10-29
+
+Audit-remediation release (security-audit run engram-run-1, medium + low
+findings).
+
+### Fixed
+- CSV export neutralises spreadsheet formula prefixes (`=`, `+`, `-`, `@`)
+  in card text (audit: csv-formula-injection-export).
+- CSV import skips rows duplicating an existing card in the target deck and
+  reports `imported/skipped` honestly (audit: csv-import-no-dedup).
+- Crash reports scrub home paths from the panic message and location, not
+  just the backtrace (audit: crash-report-partial-path-scrub).
+- Crash-report body truncation is char-boundary safe (audit:
+  crash-report-truncate-utf8-panic).
+- The text-import dialog refuses files larger than 10 MB with a clear
+  message and caches its per-file aggregates instead of rescanning every
+  record at 2 Hz (audit: import-dialog-unbounded-ui-thread).
+
+### Changed
+- Supply chain: every release-workflow action pinned to a full commit SHA;
+  `--locked` test and release builds; committed Cargo.lock includes the
+  update-check dependencies; RustSec advisories gate added to cargo-deny;
+  cargo-dist installer downloaded with a pinned checksum; top-level
+  read-only `permissions:` in CI (audit: release-workflow-mutable-actions,
+  dependency-pinning-advisories-gap, installer-script-injection-risk,
+  ci-workflow-token-scope).
+- Release artefacts are personal-data scanned before publishing; the
+  phantom scanner exclusion removed (audit: pii-scan-coverage-gap).
+- README now claims SHA-256 checksums (not "signed"); ATTRIBUTION states
+  that fonts are embedded via egui's `epaint_default_fonts` (audit:
+  readme-signed-claim).
+- `.ci-required.txt` lists all build matrix contexts and documents the
+  deliberate CodeQL/packaging-plan omissions (audit:
+  ci-required-context-gaps).
+
 ## [0.3.1] - 2026-10-28
 
 Data-safety fix release from the end-to-end security audit

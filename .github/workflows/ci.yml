@@ -9,6 +9,11 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# Least privilege by default (audit finding ci-workflow-token-scope); the
+# repo default is already read-only, this pins it against future changes.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -27,9 +32,9 @@ jobs:
     - name: Clippy (no warnings)
       run: cargo clippy --all-targets -- -D warnings
     - name: Tests
-      run: cargo test --all
+      run: cargo test --all --locked
     - name: Build release
-      run: cargo build --release
+      run: cargo build --release --locked
     - name: Upload Cargo.lock (for reproducible clean checkouts)
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
@@ -67,9 +72,9 @@ jobs:
         toolchain: stable
     - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
     - name: Tests
-      run: cargo test --all
+      run: cargo test --all --locked
     - name: Build release
-      run: cargo build --release
+      run: cargo build --release --locked
     - name: Upload ${{ matrix.artifact }} release binary
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
@@ -96,8 +101,8 @@ jobs:
     - uses: taiki-e/install-action@c1952a69c392b2c5f2eaa845b56120fff5fe49d3 # v2.48.5
       with:
         tool: cargo-deny,cargo-cyclonedx
-    - name: Dependency licences (cargo-deny)
-      run: cargo deny check licenses sources
+    - name: Dependency licences and advisories (cargo-deny)
+      run: cargo deny check licenses sources advisories
     - name: Software Bill of Materials (CycloneDX)
       run: cargo cyclonedx --format json --override-filename sbom
     - name: Upload SBOM
@@ -138,9 +143,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-    - name: Install cargo-dist (pinned)
+    - name: Install cargo-dist (pinned URL + checksum, audit finding installer-script-injection-risk)
       run: |
         curl --proto '=https' --tlsv1.2 -LsSf \
-          https://github.com/axodotdev/cargo-dist/releases/download/v0.33.1/cargo-dist-installer.sh | sh
+          https://github.com/axodotdev/cargo-dist/releases/download/v0.33.1/cargo-dist-installer.sh \
+          -o /tmp/cargo-dist-installer.sh
+        echo "a7b3b0812d624a09a534ba272aa8e04c801e56a83d553327a4a8632bc03abb94  /tmp/cargo-dist-installer.sh" | sha256sum -c -
+        sh /tmp/cargo-dist-installer.sh
     - name: Plan the release artefacts
       run: dist plan --output-format=json
