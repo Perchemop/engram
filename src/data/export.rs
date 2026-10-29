@@ -20,12 +20,24 @@ use crate::domain::library::{CardFilter, Library, Scope};
 /// The CSV header row Engram writes.
 pub const CSV_HEADER: &str = "Deck,Type,Front,Back,Tags";
 
-/// Quote one RFC-4180 field when needed.
+/// Quote one RFC-4180 field when needed, and neutralise spreadsheet
+/// formula prefixes so exported card text cannot execute as a formula when
+/// the CSV is opened in Excel/LibreOffice (audit finding
+/// csv-formula-injection-export; OWASP CSV injection guidance).
 fn csv_field(s: &str) -> String {
-    if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
-        format!("\"{}\"", s.replace('"', "\"\""))
+    let neutralised = if matches!(s.chars().next(), Some('=' | '+' | '-' | '@')) {
+        format!("'{s}")
     } else {
         s.to_string()
+    };
+    if neutralised.contains(',')
+        || neutralised.contains('"')
+        || neutralised.contains('\n')
+        || neutralised.contains('\r')
+    {
+        format!("\"{}\"", neutralised.replace('"', "\"\""))
+    } else {
+        neutralised
     }
 }
 
@@ -105,7 +117,10 @@ pub fn export_csv(path: &Path, lib: &Library, scope: Scope) -> Result<usize, Dat
 }
 
 /// Import cards from a CSV file into `deck_id`. Skips the header row when
-/// present. Returns the number of imported cards.
+/// present, and skips rows duplicating an existing card in the target deck
+/// (case-insensitive, whitespace-trimmed front — the same rule as the text
+/// importer; audit finding csv-import-no-dedup). Returns
+/// `(imported, skipped_duplicates)`.
 ///
 /// # Errors
 /// [`DataError`] on IO/parse failure. Invalid rows are skipped, not fatal.
@@ -114,9 +129,22 @@ pub fn import_csv(
     lib: &mut Library,
     deck_id: DeckId,
     now: DateTime<Utc>,
-) -> Result<usize, DataError> {
+) -> Result<(usize, usize), DataError> {
     let text = fs::read_to_string(path)?;
+    // Duplicate rule shared with the text importer (audit finding
+    // csv-import-no-dedup): re-importing an export must not duplicate the
+    // library. Case-insensitive, whitespace-trimmed front per target deck.
+    let mut existing: std::collections::HashSet<String> = lib
+        .cards
+        .iter()
+        .filter(|c| c.deck_id == deck_id)
+        .map(|c| match &c.kind {
+            CardKind::Basic { front, .. } => front.trim().to_lowercase(),
+            CardKind::Cloze { text } => text.trim().to_lowercase(),
+        })
+        .collect();
     let mut imported = 0usize;
+    let mut skipped_duplicates = 0usize;
     for fields in csv_records(&text) {
         if fields.len() < 3 {
             continue;
@@ -128,6 +156,11 @@ pub fn import_csv(
         };
         if front.eq_ignore_ascii_case("front") && kind_label.eq_ignore_ascii_case("type") {
             continue; // header
+        }
+        let key = front.trim().to_lowercase();
+        if !existing.insert(key) {
+            skipped_duplicates += 1;
+            continue;
         }
         let tags: Vec<String> = fields
             .get(4)
@@ -146,9 +179,11 @@ pub fn import_csv(
         // Invalid rows are skipped; a broken line must not abort the import.
         if lib.add_card(deck_id, kind, tags, now).is_ok() {
             imported += 1;
+        } else {
+            existing.remove(&front.trim().to_lowercase());
         }
     }
-    Ok(imported)
+    Ok((imported, skipped_duplicates))
 }
 
 /// Export the whole library as pretty JSON (a portable backup). Atomic, so
@@ -234,7 +269,7 @@ mod tests {
 
         let mut target = Library::new("Target", now());
         let tdeck = target.decks[0].id;
-        let imported = import_csv(&path, &mut target, tdeck, now()).unwrap();
+        let (imported, _) = import_csv(&path, &mut target, tdeck, now()).unwrap();
         assert_eq!(imported, 3);
         let cards = target.cards_in_scope(Scope::All);
         assert!(cards
@@ -268,7 +303,8 @@ mod tests {
 
         let mut target = Library::new("Target", now());
         let tdeck = target.decks[0].id;
-        assert_eq!(import_csv(&path, &mut target, tdeck, now()).unwrap(), 1);
+        let (multi_imported, _) = import_csv(&path, &mut target, tdeck, now()).unwrap();
+        assert_eq!(multi_imported, 1);
         let card = &target.cards[0];
         match &card.kind {
             CardKind::Basic { front, back } => {
@@ -290,7 +326,39 @@ mod tests {
         let mut l = Library::new("T", now());
         let deck = l.decks[0].id;
         let n = import_csv(&path, &mut l, deck, now()).unwrap();
-        assert_eq!(n, 1);
+        assert_eq!(n.0, 1);
+        assert_eq!(n.1, 0);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn csv_export_neutralises_formula_prefixes() {
+        // Audit finding csv-formula-injection-export.
+        let mut lib = Library::new("Formula", now());
+        let deck = lib.decks[0].id;
+        lib.add_card(
+            deck,
+            CardKind::Basic {
+                front: "=cmd|'/c calc'!A1".into(),
+                back: "@SUM(1)".into(),
+            },
+            vec![],
+            now(),
+        )
+        .unwrap();
+        let path =
+            std::env::temp_dir().join(format!("engram_formula_{}.csv", uuid::Uuid::new_v4()));
+        export_csv(&path, &lib, Scope::All).unwrap();
+        let exported = fs::read_to_string(&path).unwrap();
+        assert!(exported.contains("'=cmd"), "front must be neutralised");
+        assert!(exported.contains("'@SUM"), "back must be neutralised");
+
+        // The escape is plain text on our own import side (single quote is
+        // part of the field), which is the accepted OWASP trade-off.
+        let mut target = Library::new("T", now());
+        let tdeck = target.decks[0].id;
+        let (imported, _) = import_csv(&path, &mut target, tdeck, now()).unwrap();
+        assert_eq!(imported, 1);
         std::fs::remove_file(&path).ok();
     }
 

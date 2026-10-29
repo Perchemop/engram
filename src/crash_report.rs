@@ -86,15 +86,19 @@ pub fn install() {
     }));
 }
 
-/// Compose the full report text (scrubbed).
+/// Compose the full report text (scrubbed). The panic message and location
+/// are scrubbed too: stable rustc embeds absolute `/home/<user>/.cargo`
+/// paths for registry-dependency panics, and the report is submitted
+/// voluntarily to a public issue (audit finding
+/// crash-report-partial-path-scrub).
 #[must_use]
 pub fn format_report(message: &str, location: &str, backtrace: &str) -> String {
     let mut out = String::new();
     out.push_str("Engram crashed. The user attached this report voluntarily.\n");
     out.push_str(&format!("App version: {}\n", current_version()));
     out.push_str(&format!("OS: {}\n", os_description()));
-    out.push_str(&format!("Panic: {}\n", message));
-    out.push_str(&format!("Location: {}\n", location));
+    out.push_str(&format!("Panic: {}\n", scrub_paths(message)));
+    out.push_str(&format!("Location: {}\n", scrub_paths(location)));
     out.push_str("Backtrace (home paths scrubbed):\n");
     out.push_str(&scrub_paths(backtrace));
     out
@@ -136,7 +140,18 @@ fn to_report(text: &str) -> CrashReport {
             break;
         }
     }
-    body.truncate(16_000); // keep issues small
+    // Keep issues small: cut at a char boundary so a multi-byte character
+    // spanning the offset cannot panic while the app is starting up (audit
+    // finding crash-report-truncate-utf8-panic).
+    let cut = if body.is_char_boundary(16_000) {
+        16_000
+    } else {
+        (0..=16_000)
+            .rev()
+            .find(|&i| body.is_char_boundary(i))
+            .unwrap_or(0)
+    };
+    body.truncate(cut);
     CrashReport { title, body }
 }
 

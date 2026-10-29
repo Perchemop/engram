@@ -18,8 +18,9 @@
 # Dependency notice files that legitimately carry an upstream author's address
 # are third-party content (guide II.29.2); if such a file is ever added, the
 # scan fails loudly and a human classifies the hit rather than the check
-# guessing. This script and the release-asset scanner contain the patterns
-# themselves, so both are excluded from the tracked scan.
+# guessing. This script contains the patterns themselves, so it is excluded
+# from the tracked scan. The same script scans release artefacts via --path
+# (release.yml, audit finding pii-scan-coverage-gap).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -47,7 +48,7 @@ list_files() {
     if [ "$MODE" = path ]; then
         find "$SCAN_ROOT" -type f -print0
     else
-        git ls-files -z -- ':!scripts/scan-personal-data.sh' ':!scripts/scan-release-assets.sh'
+        git ls-files -z -- ':!scripts/scan-personal-data.sh'
     fi
 }
 
