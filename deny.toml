@@ -9,6 +9,15 @@
 [graph]
 all-features = true
 
+[advisories]
+# RustSec gate (audit finding dependency-pinning-advisories-gap): a known
+# vulnerability in any dependency fails the supply-chain job. Yanked and
+# unmaintained crates warn so the owner can plan replacement without
+# blocking a release on third-party bookkeeping.
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "warn"
+
 [licenses]
 # Require a confident match before accepting a detected licence.
 confidence-threshold = 0.9

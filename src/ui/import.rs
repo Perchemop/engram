@@ -22,6 +22,12 @@ pub struct ImportDialog {
     pub report: Option<ImportReport>,
     pub result: Option<String>,
     pub error: Option<String>,
+    /// Per-file aggregates cached at pick time so the 2 Hz immediate-mode
+    /// repaint never rescans every record (audit finding
+    /// import-dialog-unbounded-ui-thread).
+    pub cached_columns: usize,
+    pub cached_header: bool,
+    pub cached_cloze: bool,
 }
 
 impl ImportDialog {
@@ -41,6 +47,9 @@ impl ImportDialog {
             report: None,
             result: None,
             error: None,
+            cached_columns: 0,
+            cached_header: false,
+            cached_cloze: false,
         }
     }
 
@@ -51,6 +60,24 @@ impl ImportDialog {
         else {
             return;
         };
+        // Size cap (audit finding import-dialog-unbounded-ui-thread): the
+        // read and parse run on the UI thread, so refuse absurdly large
+        // files with a clear message instead of hanging the app.
+        const MAX_IMPORT_FILE_BYTES: u64 = 10 * 1024 * 1024;
+        match std::fs::metadata(&path) {
+            Ok(meta) if meta.len() > MAX_IMPORT_FILE_BYTES => {
+                self.error = Some(format!(
+                    "File is {} MB; the import limit is 10 MB",
+                    meta.len() / (1024 * 1024)
+                ));
+                return;
+            }
+            Err(e) => {
+                self.error = Some(format!("Could not read file: {e}"));
+                return;
+            }
+            Ok(_) => {}
+        }
         match std::fs::read_to_string(&path) {
             Ok(text) => {
                 self.separator = detect_separator(&text);
@@ -60,7 +87,13 @@ impl ImportDialog {
                 self.report = None;
                 self.result = None;
                 self.error = None;
-                let cols = self.column_count();
+                // Cache the per-file aggregates once: the immediate-mode UI
+                // repaints at 2 Hz and these used to rescan every record
+                // every frame.
+                self.cached_columns = self.compute_columns();
+                self.cached_header = self.compute_header();
+                self.cached_cloze = self.compute_cloze();
+                let cols = self.cached_columns;
                 if cols == 0 {
                     self.front = 0;
                     self.back = 0;
@@ -78,13 +111,22 @@ impl ImportDialog {
         }
     }
 
+    /// Columns in the widest record (cached at pick time).
     #[must_use]
     pub fn column_count(&self) -> usize {
+        self.cached_columns
+    }
+
+    fn compute_columns(&self) -> usize {
         self.records.iter().map(Vec::len).max().unwrap_or(0)
     }
 
     #[must_use]
     pub fn header_detected(&self) -> bool {
+        self.cached_header
+    }
+
+    fn compute_header(&self) -> bool {
         let Some(row) = self
             .records
             .iter()
@@ -106,13 +148,17 @@ impl ImportDialog {
             .collect()
     }
 
-    #[must_use]
-    pub fn cloze_hint(&self) -> bool {
+    fn compute_cloze(&self) -> bool {
         self.records.iter().any(|r| {
             r.get(self.front)
                 .map(|s| s.contains("{{c"))
                 .unwrap_or(false)
         })
+    }
+
+    #[must_use]
+    pub fn cloze_hint(&self) -> bool {
+        self.cached_cloze
     }
 
     pub fn run_import(

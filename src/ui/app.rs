@@ -368,8 +368,12 @@ impl EngramApp {
             return;
         };
         match data::import_csv(&path, &mut self.library, deck, Utc::now()) {
-            Ok(n) => {
-                self.status = format!("Imported {n} card(s)");
+            Ok((n, skipped)) => {
+                self.status = if skipped > 0 {
+                    format!("Imported {n} card(s), skipped {skipped} duplicate(s)")
+                } else {
+                    format!("Imported {n} card(s)")
+                };
                 self.dirty = true;
             }
             Err(e) => self.status = format!("Import failed: {e}"),

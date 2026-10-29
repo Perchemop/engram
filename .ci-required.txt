@@ -1,9 +1,20 @@
 # Authoritative CI checks (exactly as GitHub reports them).
-# The opencode/ci verification PR treats only these as verdict-deciding.
+# The verification PR treats only these as verdict-deciding; branch
+# protection on main requires the same list.
+#
+# Matrix jobs report their parameters in the name, so these must match the
+# workflow's matrix exactly - a renamed matrix entry renames the check, and
+# a stale entry here makes every run report FAILURE ("required check did not
+# report") even when everything passed. Update this file whenever ci.yml's
+# matrix or job names change.
 check
-build (macos-latest, target/release/engram, engram-macos)
 build (windows-latest, target/release/engram.exe, engram-windows)
+build (macos-latest, target/release/engram, engram-macos)
+build (ubuntu-24.04-arm, target/release/engram, engram-linux-arm64)
 supply-chain
-
-# Personal data scan (pii.yml)
-Personal data scan
+# Deliberately NOT required:
+# - `codeql`: passes today, but has a history of GitHub-side infrastructure
+#   failures (shallow-fetch and pr-diff-range extension errors). Still
+#   reported on every run so regressions stay visible; see PROGRESS.md.
+# - `packaging-plan`: cargo-dist is planned but not yet adopted; the job is
+#   informational until then.

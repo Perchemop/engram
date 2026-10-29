@@ -46,7 +46,7 @@ licence, MIT.
 |---|---|---|
 | Application icon | Procedurally generated at runtime in `src/ui/icon.rs`; master vector in `assets/engram.svg`; original design (see `docs/design/brand.md`) | MIT |
 | Colour tokens | Original palette defined in `src/domain/deck.rs` and `src/ui/theme.rs`; not derived from any other product | MIT |
-| Fonts | No font files are bundled. Text uses the default fonts shipped by egui (its proportional, monospace and emoji faces, e.g. `Ubuntu-Light`, `Hack` and the Noto/emoji fonts in egui 0.36), each under its own permissive licence in the egui distribution | MIT OR Apache-2.0 (upstream) |
+| Fonts | No standalone font files are bundled; text uses the fonts compiled into the binary via egui's `epaint_default_fonts` crate (proportional, monospace and emoji faces, e.g. `Ubuntu-Light`, `Hack` and the Noto/emoji fonts in egui 0.36), each under its own permissive licence in the egui distribution — which is why `deny.toml` allows the OFL-1.1 and Ubuntu-font-1.0 classes | MIT OR Apache-2.0 (upstream) |
 
 ## Project licence
 
