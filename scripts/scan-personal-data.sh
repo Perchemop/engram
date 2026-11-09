@@ -55,7 +55,7 @@ EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 # scan ran. A NEW address in an artifact still fails loudly and must be
 # classified by a human - never grow this list casually.
 EMAIL_OK_CORE='(example\.(com|org|net)|users\.noreply\.github\.com|noreply\.github\.com|[A-Za-z0-9.-]+\.(example|invalid|test|localhost))'
-EMAIL_OK_ARTIFACTS_CORE='(appro@openssl\.org|info@e-szigno\.hu|dave@understandinglimited\.com)'
+EMAIL_OK_ARTIFACTS_CORE='(appro@openssl\.org|info@e-szigno\.hu|dave@understandinglimited\.com|jimmac@gmail\.com)'
 
 list_files() {
     if [ "$MODE" = path ]; then
