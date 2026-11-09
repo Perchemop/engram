@@ -40,9 +40,22 @@ HOME_RE='/home/[A-Za-z0-9_.-]+|/Users/[A-Za-z0-9_.-]+|C:\\Users\\[A-Za-z0-9_.-]+
 # /home/user, /Users/user and C:\Users\user are additionally allowed: the
 # generic placeholder username reveals nothing personal, and it appears in
 # path-scrubbing tests (guide II.29.6) and documentation examples.
-HOME_ALLOW='(/home/runner|/Users/runner|C:\\Users\\runner|/home/user|/Users/user|C:\\Users\\user)$'
+# /home/runner, /Users/runner, C:\Users\runner and the -admin variants are
+# the GitHub Actions runner users: they appear inside release binaries
+# (build-machine paths baked in by the toolchain) and carry no personal
+# data. Classified 2026-11-09 when the release-artifact scan (finding
+# pii-scan-coverage-gap) first ran on dist/.
+HOME_ALLOW='(/home/runner|/Users/runner|C:\\Users\\runner|/home/runneradmin|/Users/runneradmin|C:\\Users\\runneradmin|/home/user|/Users/user|C:\\Users\\user)$'
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-EMAIL_ALLOW='@(example\.(com|org|net)|users\.noreply\.github\.com|noreply\.github\.com|[A-Za-z0-9.-]+\.(example|invalid|test|localhost))$'
+# Synthetic addresses and GitHub noreply are allowed everywhere. In
+# --path (release-artifact) mode, upstream third-party notice addresses
+# baked into vendored/static dependency code (e.g. OpenSSL author strings
+# inside a vendored crate) are third-party content per guide II.29.2: the
+# addresses below were classified on 2026-11-09 when the first artifact
+# scan ran. A NEW address in an artifact still fails loudly and must be
+# classified by a human - never grow this list casually.
+EMAIL_OK_CORE='(example\.(com|org|net)|users\.noreply\.github\.com|noreply\.github\.com|[A-Za-z0-9.-]+\.(example|invalid|test|localhost))'
+EMAIL_OK_ARTIFACTS_CORE='(appro@openssl\.org|info@e-szigno\.hu|dave@understandinglimited\.com)'
 
 list_files() {
     if [ "$MODE" = path ]; then
@@ -59,11 +72,20 @@ home_hits="$(
     done | grep -vE "$HOME_ALLOW" || true
 )"
 
+email_allow="@$EMAIL_OK_CORE\$"
+if [ "$MODE" = path ]; then
+    # Release-artifact mode: upstream third-party notice addresses baked
+    # into vendored dependency code are classified third-party content
+    # (guide II.29.2); they are skipped here but must never appear in a
+    # tracked tree file, where the plain allowlist still applies.
+    email_allow="(@$EMAIL_OK_CORE|$EMAIL_OK_ARTIFACTS_CORE)\$"
+fi
+
 email_hits="$(
     list_files | while IFS= read -r -d '' f; do
         [ -f "$f" ] || continue
         grep -HnaoE "$EMAIL_RE" "$f" 2>/dev/null || true
-    done | grep -vEi "$EMAIL_ALLOW" || true
+    done | grep -vEi "$email_allow" || true
 )"
 
 fail=0
