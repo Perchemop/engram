@@ -98,7 +98,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: stable
-    - uses: taiki-e/install-action@c1952a69c392b2c5f2eaa845b56120fff5fe49d3 # v2.48.5
+    - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
       with:
         # Explicit pin: the action's `latest` resolves to cargo-deny 0.16.4,
         # whose bundled rustsec crate cannot parse the current advisory DB
